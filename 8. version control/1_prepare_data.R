@@ -106,6 +106,9 @@ all.pred$dmax.hauc <- all.pred$dmax/all.pred$hauc
 
 all.pred$H <- 10^(-all.pred$pH_lab)
 
+all.pred$CN <- all.pred$DOC/all.pred$DN
+all.pred$CP <- all.pred$DOC/all.pred$DP
+
 #Altitude Langtjern
 all.pred[grep("13763",all.pred$Sample_ID),which(names(all.pred) == "Altitude")] <- 516
 
@@ -136,13 +139,14 @@ ggplot(all.pred,aes(x=lake_name,y=propTOC))+geom_text(aes(label=Sample_ID))+geom
   geom_abline(slope=0,intercept= mean(propTOC)+sd(propTOC),col="pink")+
   geom_abline(slope=0,intercept= mean(propTOC)-sd(propTOC),col="pink")
 
-# final df ---
+# remove outliers ---
 all.70 <- filter(all.pred,!Sample_ID %in% c("12777","13156","13196"))
 
-# select parameters
+# select and rename parameters ----
+
 sel <- c("Sample_ID","hauc","tmax","hwidth","dmax","dmax.hauc","dmax.DOC","hauc.DOC","lag_bdg",
          "temp","long","lat","pH_lab","H","cond_µS.m","alk_meq.L",
-         "TOC","TN","TP","DOC","DN","DP",
+         "TOC","TN","TP","DOC","DN","DP","CN","CP",
          "O2_µM", "CO2_µM","CH4_nM",
          "cells_counts.mL",
          "Fluoride_mg.L","Chloride_mg.L","Nitrite_mg.L","Bromide_mg.L","Sulfate_mg.L","Nitrate_mg.L",
@@ -153,7 +157,7 @@ sel <- c("Sample_ID","hauc","tmax","hwidth","dmax","dmax.hauc","dmax.DOC","hauc.
 lakes70 <- all.70[sel]
 names(lakes70) <- c("Sample_ID","LOC","tmax","BdgT","Vmax","Vmax.LOC","Vmax.DOC","LOC.DOC","lag_bdg",
                     "temperature","long","lat","pH","H","conductivity","alkalinity",
-                    "TOC","TN","TP","DOC","DN","DP",
+                    "TOC","TN","TP","DOC","DN","DP","CN","CP",
                     "O2","CO2","CH4",
                     "cells",
                     "F","Cl","NO2","Br","SO4","NO3","Cr","Ni","Cu","Zn","As","Cd","Pb","V","Mn","Co",

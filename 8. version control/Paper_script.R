@@ -10,6 +10,7 @@ library(dendextend)
 library("effectsize")
 library(factoextra)
 library(viridisLite)
+library(reshape2)
 
 source("5. 100 lakes/100lakes_analysis_functions.R")
 norgemap <- st_read("3. Maps/TM_WORLD_BORDERS-0.3.shp")
@@ -30,6 +31,7 @@ lakes70 <- sel70[-which(names(sel70) %in% useless.params)]
 
 write.csv(lakes70,"5. 100 lakes/lakes70.csv")
 lakes70 <- read.csv("5. 100 lakes/lakes70.csv")
+lakes70$Ca_NIVA <- merge(lakes70,select(niva1000,Ca),by.x = "Sample_ID",by.y = "Sample_ID")
 
 # maps -----
 
@@ -68,24 +70,111 @@ F <- ggplot(lakes70)+geom_boxplot(aes(x=DP,y="DP (ug/L)"))+theme_light(base_size
 G <- ggplot(lakes70)+geom_boxplot(aes(x=TOC,y="TOC (mg/L)"))+theme_light(base_size=15)+labs(x="",y="")
 H <- ggplot(lakes70)+geom_boxplot(aes(x=TN,y="TN (mg/L)"))+theme_light(base_size=15)+labs(x="",y="")
 I <- ggplot(lakes70)+geom_boxplot(aes(x=TP,y="TP (ug/L)"))+theme_light(base_size=15)+labs(x="",y="")
+J <- ggplot(lakes70)+geom_boxplot(aes(x=DOC/DN,y="C:N (dissolved)"))+theme_light(base_size=15)+labs(x="",y="")
+K <- ggplot(lakes70)+geom_boxplot(aes(x=TOC/TN,y="C:N (total)"))+theme_light(base_size=15)+labs(x="",y="")
 gD <- ggplotGrob(D)
 gE <- ggplotGrob(E)
 gF <- ggplotGrob(F)
 gG <- ggplotGrob(G)
 gH <- ggplotGrob(H)
 gI <- ggplotGrob(I)
+gJ <- ggplotGrob(J)
+gK <- ggplotGrob(K)
 grid::grid.newpage()
-grid::grid.draw(cbind(rbind(gD,gE,gF),rbind(gG,gH,gI)))
+grid::grid.draw(cbind(rbind(gD,gE,gF,gJ),rbind(gG,gH,gI,gK)))
+
+L <- ggplot(lakes70)+geom_boxplot(aes(x=pH_lab,y="pH"))+theme_light(base_size=15)+labs(x="",y="") 
+gL <- ggplotGrob(L)
+M <- ggplot(lakes70)+geom_boxplot(aes(x=alk_meq.L,y="alkalinity (meq/L)"))+theme_light(base_size=15)+labs(x="",y="")
+gM <- ggplotGrob(M)
+grid::grid.newpage()
+grid::grid.draw(rbind(gL,gM))
+
 A <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax,y="Biodeg\n(uM/h)"))+theme_light(base_size=15)+labs(x="",y="")
+A2 <- ggplot(lakes70)+geom_boxplot(aes(x=LOC,y="LOC\n(uM)"))+theme_light(base_size=15)+labs(x="",y="")
 B <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax.DOC,y="Biodeg_s\n(h-1)"))+theme_light(base_size=15)+labs(x="",y="")
 C <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax.LOC,y="Biodeg_LOC\n(h-1)"))+theme_light(base_size=15)+labs(x="",y="")
 gA <- ggplotGrob(A)
+gA2 <- ggplotGrob(A2)
 gB <- ggplotGrob(B)
 gC <- ggplotGrob(C)
 grid::grid.newpage()
-grid::grid.draw(rbind(gA,gB,gC))
+grid::grid.draw(cbind(rbind(gA,gA2),rbind(gB,gC)))
+
+ggplot(lakes70)+geom_point(aes(x=LOC,y=Vmax,col=DOC))+scale_color_viridis_c(direction = -1, end = 0.9)+theme_light(base_size=20)
 
 dev.off()
+
+# Charge balance with ions -----
+lakes70_ions <- read.csv("5. 100 lakes/all.parameters.csv") %>% select(c("Sample_ID","Ca","Mg","Na","K","Al_R",
+           "Sulfate_mg.L","Nitrate_mg.L","Nitrite_mg.L","Chloride_mg.L",
+           "Phosphate_mg.L","alk_meq.L","cond_µS.m","CO2_µM","pH_lab","TOC"))
+lakes70_ions$Ca_meq.L <- lakes70_ions$Ca/40.078*2 
+lakes70_ions$Mg_meq.L <- lakes70_ions$Mg/24.305*2
+lakes70_ions$Na_meq.L <- lakes70_ions$Na/23.0
+lakes70_ions$K_meq.L <- lakes70_ions$K/39.0983
+lakes70_ions$Al_meq.L <- lakes70_ions$Al_R*10^(-3)/26.982*3
+lakes70_ions$Sulfate_meq.L <- lakes70_ions$Sulfate_mg.L/(32.06+4*15.999)*(-2)
+lakes70_ions$Nitrate_meq.L <- lakes70_ions$Nitrate_mg.L/(14+3*15.999)*(-1)
+lakes70_ions$Nitrite_meq.L <- lakes70_ions$Nitrite_mg.L/(14+2*15.999)*(-1)
+lakes70_ions$Chloride_meq.L <- lakes70_ions$Chloride_mg.L/(35.45)*(-1)
+lakes70_ions$Phosphate_meq.L <- lakes70_ions$Phosphate_mg.L/(30.974+4*15.999)*(-3)
+
+# carbonate speciation
+Kh <- 0.0316227766016838
+K1 <- 5.01187233627272E-07
+K2 <- 5.62341325190349E-11
+
+lakes70_ions$co2_mol.L <- lakes70_ions$CO2_µM*10^(-6)
+lakes70_ions$h2co3 <- lakes70_ions$co2_mol.L* Kh
+lakes70_ions$hco3 <- lakes70_ions$h2co3 * K1 / 10^(-lakes70_ions$pH_lab)
+lakes70_ions$co3 <- lakes70_ions$hco3 * K2 / 10^(-lakes70_ions$pH_lab)
+
+lakes70_ions$hco3_meq.L <- lakes70_ions$hco3*10^3*(-1)
+
+# organic anions
+lakes70_ions$pK_organions <- 0.96 + 0.90 * lakes70_ions$pH_lab - 0.039 * lakes70_ions$pH_lab ^2
+lakes70_ions$organions_meq.L <- - (lakes70_ions$TOC*10) * 10^(-lakes70_ions$pK_organions) / (10^(-lakes70_ions$pH_lab)+10^(-lakes70_ions$pK_organions)) / 1000
+
+# balance
+lakes70_ions <- lakes70_ions %>% rowwise() %>% 
+  mutate(sum_cations = sum(Ca_meq.L,Mg_meq.L,Na_meq.L,K_meq.L,Al_meq.L, na.rm = TRUE))
+lakes70_ions <-  lakes70_ions %>% rowwise() %>%
+  mutate(sum_anions = sum(Sulfate_meq.L,Nitrate_meq.L,Chloride_meq.L,Nitrite_meq.L,
+                          hco3_meq.L,organions_meq.L,na.rm = TRUE)) 
+lakes70_ions$balance <- lakes70_ions$sum_cations + lakes70_ions$sum_anions
+lakes70_ions$EB <- (lakes70_ions$sum_cations + lakes70_ions$sum_anions)/
+  (lakes70_ions$sum_cations - lakes70_ions$sum_anions) * 100
+
+#bar chart
+lakes70_cations_melt <- lakes70_ions %>% select(c("Sample_ID", "Ca_meq.L","Mg_meq.L","Na_meq.L","K_meq.L")) %>%
+  melt(id.vars = "Sample_ID",measure.vars = c("Ca_meq.L","Mg_meq.L","Na_meq.L","K_meq.L"),
+       variable.name = "ion", value.name = "concentration_meq.L")
+lakes70_cations_melt$sample_axis <- paste(lakes70_cations_melt$Sample_ID,".1",sep="")
+lakes70_cations_melt$type <- "cation"
+
+lakes70_anions_melt <- lakes70_ions %>% 
+  select(c("Sample_ID", "Sulfate_meq.L","Nitrate_meq.L","Chloride_meq.L","hco3_meq.L","organions_meq.L")) %>%
+  melt(id.vars = "Sample_ID",measure.vars = c("Sulfate_meq.L","Nitrate_meq.L","Chloride_meq.L","hco3_meq.L","organions_meq.L"),
+       variable.name = "ion", value.name = "concentration_meq.L")
+lakes70_anions_melt$concentration_meq.L <- lakes70_anions_melt$concentration_meq.L * (-1)
+lakes70_anions_melt$sample_axis <- paste(lakes70_anions_melt$Sample_ID,".2",sep="")
+lakes70_anions_melt$type <- "anion"
+
+
+lakes70_ions_melt <- rbind(lakes70_cations_melt,lakes70_anions_melt)
+lakes70_ions_melt$type <- factor(lakes70_ions_melt$type,levels = c("cation","anion"))
+
+ggplot(lakes70_ions_melt,aes(x=type,y=concentration_meq.L,fill=ion))+geom_bar(stat = "identity")+
+  scale_fill_viridis_d(option = "viridis",begin = 0.2)+ facet_wrap(Sample_ID~.,ncol = 35,strip.position = "bottom")+
+  theme_minimal(base_size = 15)+
+  theme(axis.text.x = element_blank(),
+        legend.title = element_blank(),panel.grid.major.x = element_blank(),
+        legend.position = "bottom",
+        panel.grid.major.y = element_line(colour="grey95"),
+        panel.grid.minor.y = element_line(colour="grey95"))+
+  labs(x="Sample",y="meq/L")
+ggsave("5. 100 lakes/charge_balance_ions.png",width = 20, height = 10)
 
 # correlations ----
 print.cor.signif2(lakes70,"Vmax.LOC")

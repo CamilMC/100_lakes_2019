@@ -25,44 +25,50 @@ lakes70 <- read.csv("5. 100 lakes/lakes70.csv")
 useless.params <- c("X","NVE_number","DNA_ug.mL","filtered_mL","SAR","s_350_400",
                     "Lake_Area","ionic_strength_.mol.L","cluster","Al","CO2_nM.h","N2_nM.h","O2_nM.h","CH4_nM.h","N2O_nM.h",
                     "TCN","TCP","week")
-lakes70 <- sel70[-which(names(sel70) %in% useless.params)]
+lakes70$log.Vmax <- log(lakes70$Vmax)
+lakes70$log.Vmaxs <- log(lakes70$Vmax.DOC)
 
 
-                         
+
 # maps -----
 
 pdf("5. 100 lakes/Vmax_maps.pdf",width=10,height=10)
 
 ggplot()+geom_sf(data=norgemap)+
-  geom_point(data=lakes70,aes(x=long,y=lat,col=Vmax),size=4)+
-  geom_point(data=filter(lakes70,Vmax >8),aes(x=long,y=lat,size=Vmax))+scale_size(limits=c(8,27))+
-  theme_void(base_size = 24)+labs(x="",y="",col="Biodeg\numol/L/h",size="Outliers")+
+  geom_point(data=lakes70,aes(x=long,y=lat,col=Vmax),size=5)+
+  geom_point(data=filter(lakes70,Vmax >8),aes(x=long,y=lat,size=Vmax))+scale_size(limits=c(8,30),breaks=c(10,20,30),range=c(4,6))+
+  theme_void(base_size = 24)+labs(x="",y="",col=expression(atop("Vmax",paste("(",mu,"mol/L/h)"))),size="outliers")+
   scale_color_gradientn(colors = viridis(9,direction = -1,end=0.9),limits=c(0,8))+
   #geom_text(data=filter(lakes70,Vmax>8),aes(x=long,y=lat,label=round(Vmax,0)),nudge_y=0.1)+
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
   theme(legend.position = c(.87,.45))+
   xlim(5,15)+ylim(58,63)
 
 ggplot()+geom_sf(data=norgemap)+
-  geom_point(data=lakes70,aes(x=long,y=lat,col=Vmax.LOC),size=4)+
-  theme_void(base_size = 24)+labs(x="",y="",col="Biodeg_LOC\n(h-1)")+
+  geom_point(data=lakes70,aes(x=long,y=lat,col=Vmax.LOC),size=5)+
+  theme_void(base_size = 24)+labs(x="",y="",col=expression(atop("Vmax/LOC",(h^{-1}))))+
   scale_color_viridis_c(direction = -1, end = 0.9)+
-  theme(legend.position = c(.9,.7))+
+  theme(legend.position = c(.9,.45))+
   xlim(5,15)+ylim(58,63)
 
 ggplot()+geom_sf(data=norgemap)+
-  geom_point(data=lakes70,aes(x=long,y=lat,col=Vmax.DOC),size=4)+
-  theme_void(base_size = 24)+labs(x="",y="",col="Biodeg_s\n(h-1)")+
+  geom_point(data=lakes70,aes(x=long,y=lat,col=Vmax.DOC),size=5)+
+  geom_point(data=filter(lakes70,Vmax.DOC >2),aes(x=long,y=lat,size=Vmax.DOC))+scale_size(limits=c(2,10),breaks=c(3,5,10),range=c(4,6))+
+  theme_void(base_size = 24)+labs(x="",y="",col=expression(atop("Vmax/DOC",(h^{-1}))),size="outliers")+
   scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,2))+
-  geom_text(data=filter(lakes70,Vmax.DOC >2),aes(x=long,y=lat,label=round(Vmax.DOC,2)),nudge_y = -0.09,nudge_x = -0.1)+  
-  theme(legend.position = c(.9,.7))+
+  #geom_text(data=filter(lakes70,Vmax.DOC >2),aes(x=long,y=lat,label=round(Vmax.DOC,2)),nudge_y = -0.09,nudge_x = -0.1)+
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.87,.45))+
   xlim(5,15)+ylim(58,63)
 
 ggplot()+geom_sf(data=norgemap)+
   geom_point(data=lakes70,aes(x=long,y=lat,col=LOC.DOC),size=4)+
-  theme_void(base_size = 24)+labs(x="",y="",col="%DOC\nconsumed")+
-  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,0.10))+
-  geom_text(data=filter(lakes70,LOC.DOC >0.10),aes(x=long,y=lat,label=round(LOC.DOC,2)),nudge_y = -0.09,nudge_x = -0.1)+  
-  theme(legend.position = c(.9,.7))+
+  theme_void(base_size = 24)+labs(x="",y="",col="%DOC\nconsumed",size="outliers")+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,4))+
+  geom_point(data=filter(lakes70,LOC.DOC >4),aes(x=long,y=lat,size=LOC.DOC))+scale_size(limits=c(4,20),breaks=c(5,10,15),range=c(4,6))+
+#  geom_text(data=filter(lakes70,LOC.DOC >3),aes(x=long,y=lat,label=round(LOC.DOC,2)),nudge_y = -0.09,nudge_x = -0.1)+  
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.87,.5))+
   xlim(5,15)+ylim(58,63)
 
 ggplot()+geom_sf(data=norgemap)+
@@ -102,10 +108,21 @@ ggplot()+geom_sf(data=norgemap)+
   theme(legend.position = c(.9,.6))+
   xlim(5,15)+ylim(58,63)
 
+ggplot()+geom_sf(data=norgemap)+
+  geom_point(data=lakes70,aes(x=long,y=lat,col=DOC),size=5)+
+  #geom_point(data=filter(lakes70,DOC > 20),aes(x=long,y=lat,size= DOC))+scale_size(limits=c(20,21))+
+  theme_void(base_size = 26)+labs(x="",y="",col="DOC\nmg/L",size="Outliers")+
+  # scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9))+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(1,20))+
+#  geom_text(data=filter(lakes70,DOC > 15),aes(x=long,y=lat,label=round(DOC,1)),nudge_y = -0.1,nudge_x = -0.0)+ 
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.9,.6))+
+  xlim(5,15)+ylim(58,63)
+
 dev.off()
 
 
-# clusters ---
+# clusters -----
 
 csel <- c("Sample_ID",
           "temperature","pH","conductivity","alkalinity",
@@ -156,17 +173,32 @@ plot(dendplotc,horiz = T)
 dev.off()
 
 
-# map of clusters -----
+# graphs and map of clusters -----
+pdf("5. 100 lakes/bdg_by_cluster.pdf",width=10,height=8)
 ggplot(lakes70,aes(y=Vmax.LOC,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
-  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=20)+ylab("Biodeg")
-ggsave("5. 100 lakes/boxplot_biodeg_clusters.png",width=10,height=8)
+  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=26)+ylab("Vmax/LOC")
+ggplot(lakes70,aes(y=Vmax,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
+  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=26)+ylab("Vmax")
+ggplot(lakes70,aes(y=Vmax.DOC,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
+  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=26)+ylab("Vmax/DOC")
+
+ggplot(lakes70,aes(y=log.Vmax,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
+  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=20)+ylab("log Vmax")
+ggplot(lakes70,aes(y=log.Vmaxs,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
+  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=20)+ylab("log Vmax/DOC")
+
+
+dev.off()
 
 ggplot()+geom_sf(data=norgemap)+
-  geom_point(data=lakes70,aes(x=long,y=lat,col=as.character(cluster)),size=4)+
+  geom_point(data=lakes70,aes(x=long,y=lat,col=as.character(cluster)),size=5)+
   theme_void(base_size = 24)+labs(x="",y="",col="cluster")+
   scale_color_manual(values=colors_cluster)+
+  theme(legend.position = c(.87,.45))+
   xlim(5,15)+ylim(58,63)
 ggsave("5. 100 lakes/map_clusters.png",width=10,height = 12)
+
+hist(lakes70$log.Vmax)
 
 # ANOVA -----
 
@@ -243,7 +275,8 @@ x <- c("Biodeg_LOC", "CN","pH","Al",
        "Alkalinity","Conductivity","CO2","TN","TP","Cl-","SO4","Bdg period",
        "SUVA", "As75",
        "CH4","cells_counts.mL","SR","CP",
-       "DP","Ca","O2","tmax","Biodeg","Biodeg_s","%DOM")
+       "DP","Ca","O2","tmax","Biodeg","Biodeg_s","%DOM",
+       "log.biodeg","log.biodegs")
 x.graph <- x[x %in% ptt.graph$param]
 
 ggplot(ptt.graph,aes(y=param))+geom_point(aes(x=ptt12,col="12",shape=pvalue),size=5)+
@@ -272,7 +305,7 @@ for (i in 1:length(names(lakes70))){
   kwt <- kruskal.test(lakes70[,param]~lakes70$cluster)
   pval <- kwt$p.value
   #es <- eta_squared(aovt)$Eta_Sq_partial
-  pwt <- pairwise.wilcox.test(lakes70[,param],lakes70$cluster,p.adjust.method = "holm")
+  pwt <- pairwise.wilcox.test(lakes70[,param],lakes70$cluster,p.adjust.method = "holm",paired=FALSE)
   kw_summary$pvalue[i] <- pval
   #kw_summary$effect_size[i] <- es
   kw_summary$pwt12[i] <- pwt$p.value[1]
@@ -281,7 +314,7 @@ for (i in 1:length(names(lakes70))){
 }
 
 names(kw_summary)[1] <- "param"
-write_xlsx(kw_summary,path="5. 100 lakes/anovas_clusters_fdr.xlsx")
+write_xlsx(kw_summary,path="5. 100 lakes/kw_clusters_fdr.xlsx")
 
 
 pwt <- kw_summary %>% select(c("param","pwt12","pwt13","pwt23","pvalue"))
@@ -323,7 +356,22 @@ ggplot(pwt.graph,aes(y=param))+geom_point(aes(x=pwt12,col="12",shape=pvalue),siz
 ggsave("5. 100 lakes/cluster_difference.png",height = 15,width = 10)
 
 # data presentation ----
+library(grid)
+vp <- viewport(x=0.45,y=0.5,width=0.9,height=0.9)
+
 pdf("5. 100 lakes/CBA_figures.pdf",width=10,height = 5)
+pushViewport(vp)
+A <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax,y="Biodeg\n(uM/h)"))+theme_light(base_size=15)+labs(x="",y="")
+A2 <- ggplot(lakes70)+geom_boxplot(aes(x=LOC,y="LOC\n(uM)"))+theme_light(base_size=15)+labs(x="",y="")
+B <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax.DOC,y="Biodeg_s\n(h-1)"))+theme_light(base_size=15)+labs(x="",y="")
+C <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax.LOC,y="Biodeg_LOC\n(h-1)"))+theme_light(base_size=15)+labs(x="",y="")
+gA <- ggplotGrob(A)
+gA2 <- ggplotGrob(A2)
+gB <- ggplotGrob(B)
+gC <- ggplotGrob(C)
+grid::grid.newpage()
+grid::grid.draw(cbind(rbind(gA,gA2),rbind(gB,gC)))
+
 D <- ggplot(lakes70)+geom_boxplot(aes(x=DOC,y="DOC (mg/L)"))+theme_light(base_size=15)+labs(x="",y="")
 E <- ggplot(lakes70)+geom_boxplot(aes(x=DN,y="DN (mg/L)"))+theme_light(base_size=15)+labs(x="",y="")
 F <- ggplot(lakes70)+geom_boxplot(aes(x=DP,y="DP (ug/L)"))+theme_light(base_size=15)+labs(x="",y="")
@@ -347,19 +395,16 @@ L <- ggplot(lakes70)+geom_boxplot(aes(x=pH_lab,y="pH"))+theme_light(base_size=15
 gL <- ggplotGrob(L)
 M <- ggplot(lakes70)+geom_boxplot(aes(x=alk_meq.L,y="alkalinity (meq/L)"))+theme_light(base_size=15)+labs(x="",y="")
 gM <- ggplotGrob(M)
+N <- ggplot(lakes70)+geom_boxplot(aes(x=Altitude,y="Altitude (m)"))+theme_light(base_size=15)+labs(x="",y="")
 grid::grid.newpage()
 grid::grid.draw(rbind(gL,gM))
 
-A <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax,y="Biodeg\n(uM/h)"))+theme_light(base_size=15)+labs(x="",y="")
-A2 <- ggplot(lakes70)+geom_boxplot(aes(x=LOC,y="LOC\n(uM)"))+theme_light(base_size=15)+labs(x="",y="")
-B <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax.DOC,y="Biodeg_s\n(h-1)"))+theme_light(base_size=15)+labs(x="",y="")
-C <- ggplot(lakes70)+geom_boxplot(aes(x=Vmax.LOC,y="Biodeg_LOC\n(h-1)"))+theme_light(base_size=15)+labs(x="",y="")
-gA <- ggplotGrob(A)
-gA2 <- ggplotGrob(A2)
-gB <- ggplotGrob(B)
-gC <- ggplotGrob(C)
+N <- ggplot(lakes70)+geom_boxplot(aes(x=Altitude,y="Altitude (m)"))+theme_light(base_size=15)+labs(x="",y="")
+gN <- ggplotGrob(N)
+
 grid::grid.newpage()
-grid::grid.draw(cbind(rbind(gA,gA2),rbind(gB,gC)))
+grid::grid.draw(cbind(rbind(gD,gE,gJ),rbind(gF,gL,gN)))
+
 
 ggplot(lakes70)+geom_point(aes(x=LOC,y=Vmax,col=DOC))+scale_color_viridis_c(direction = -1, end = 0.9)+theme_light(base_size=20)
 
@@ -368,6 +413,7 @@ dev.off()
 summary_lakes70 <- do.call(cbind,lapply(lakes70,summary)) %>% as.data.frame()
 summary_lakes70[,1] <- rownames(summary_lakes70)
 write_xlsx(summary_lakes70,"5. 100 lakes/summary_lakes70.xlsx")
+
 
 
 # Charge balance with ions -----
@@ -449,7 +495,7 @@ print.cor.signif2(lakes70,"LOC")
 print.cor.signif2(lakes70,"Vmax.DOC")
 print.cor.signif2(lakes70,"DOC")
 
-# figures for paper ----
+# correlataions - figures ----
 
 pdf("5. 100 lakes/Vmax_corr.pdf",height = 10,width=15)
 cor_param_Vmax <- c("Sample_ID","LOC","Vmax","CN","CP") 
@@ -470,9 +516,8 @@ print.cor.signif2(cor_Vmax.LOC,"Biodeg_LOC",title = F,y1=-0.7,y2=0.5)
 dev.off()
 
 # PCA -----
-pca_params <- c("Altitude","pH_lab","SR","Vmax.LOC","DN","SUVA","DOC","alk_meq.L","Vmax","Vmax.DOC","CN","CP")
+pca_params <- c("Altitude","pH","SR","Vmax.LOC","DN","SUVA","DOC","alkalinity","Vmax","Vmax.DOC","CN","CP")
 lakes70pca <- lakes70[pca_params]
-names(lakes70pca) <- c("Altitude","pH","SR","Biodeg_LOC","DN","SUVA","DOC","Alkalinity","Biodeg","Biodeg_s","CN","CP")
 pca70lakes <- prcomp(~.,data=lakes70pca,scale.=T,center=T)
 pcafviz <- fviz_pca_biplot(pca70lakes, repel=T,label = "var",col.var = "contrib",col.ind = "contrib",
                            gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=5,title="")+ theme_light(base_size=20) 

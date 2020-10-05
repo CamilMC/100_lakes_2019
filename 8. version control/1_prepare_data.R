@@ -46,10 +46,18 @@ tm_data <- read_xlsx("5. 100 lakes/100lakes_ICPMS.xlsx",sheet = "Sheet3")
 bcations <- read_xlsx("5. 100 lakes/100lakes_base_cations.xlsx",col_types = c("text","numeric","numeric","numeric","numeric","numeric","numeric"))
 
 #niva data
-niva100 <- read.csv("7. 1000 lakes/niva1000.csv") %>% 
-  select(c("Sample_ID","Lake_Area","Altitude","Ca","Mg","Na","K","Al_R","Al_Il","NH4.N")) %>% 
-  distinct()
-names(niva100) <- c("Sample_ID","Lake_Area","Altitude","Ca_NIVA","Mg_NIVA","Na_NIVA","K_NIVA","Al_R","Al_Il","NH4.N")
+niva100 <- read.csv("7. 1000 lakes/niva1000.csv") %>% select(-c("dmax","hauc","hwidth","tmax","lag_bdg","Latitude","Longitude")) %>% distinct()
+names(niva100)[which(names(niva100)=="Ca")] <- "Ca_NIVA"
+names(niva100)[which(names(niva100)=="Na")] <- "Na_NIVA"
+names(niva100)[which(names(niva100)=="K")] <- "K_NIVA"
+names(niva100)[which(names(niva100)=="Mg")] <- "Mg_NIVA"
+names(niva100)[which(names(niva100)=="DOC")] <- "DOC_NIVA"
+names(niva100)[which(names(niva100)=="TOC.x")] <- "TOC_NIVA"
+niva100$TOC.y <- NULL
+niva100$sUVa <- NULL
+niva100$incubation_date
+#names(niva100)[which(names(niva100)=="Mg")] <- "Mg_NIVA"
+
 missinglakes <- setdiff(lake$lake_id,niva100$Sample_ID) %>% as.data.frame()
 emptylakes <-  missinglakes %>% cbind(matrix(data = NA, nrow = dim(missinglakes)[1], ncol = dim(niva100)[2]-1)) %>% setNames(names(niva100))
 
@@ -83,24 +91,16 @@ all.pred$SAR <- all.pred$abs254/all.pred$abs410
 all.pred$s_350_400[all.pred$s_350_400 <= 0 ] <- NA
 all.pred$SR <- all.pred$s_275_295/all.pred$s_350_400
 
-all.pred$hauc.TOC <- all.pred$hauc/all.pred$TOC
-all.pred$auc.TOC <- all.pred$auc/all.pred$TOC
-all.pred$dmax.TOC <- all.pred$dmax/all.pred$TOC
-all.pred$tmax.TOC <- all.pred$tmax / all.pred$TOC
-all.pred$hwidth.TOC <- all.pred$hwidth/ all.pred$TOC
-
-all.pred$hauc.DOC <- all.pred$hauc/all.pred$DOC
-all.pred$auc.DOC <- all.pred$auc/all.pred$DOC
-all.pred$dmax.DOC <- all.pred$dmax/all.pred$DOC
-all.pred$tmax.DOC <- all.pred$tmax / all.pred$DOC
-all.pred$hwidth.DOC <- all.pred$hwidth/ all.pred$DOC
+#all.pred$hauc.DOC <- all.pred$hauc/all.pred$DOC
+#all.pred$dmax.DOC <- all.pred$dmax/all.pred$DOC
+#all.pred$tmax.DOC <- all.pred$tmax / all.pred$DOC
+#all.pred$hwidth.DOC <- all.pred$hwidth/ all.pred$DOC
 
 all.pred$DOC_umol.L <- all.pred$DOC/12 * 10^(3)
 all.pred$hauc.DOCumol <- all.pred$hauc/all.pred$DOC_umol.L
-all.pred$auc.DOCumol <- all.pred$auc/all.pred$DOC_umol.L
 all.pred$dmax.DOCumol <- all.pred$dmax/all.pred$DOC_umol.L
-all.pred$tmax.DOCumol <- all.pred$tmax / all.pred$DOC_umol.L
-all.pred$hwidth.DOCumol <- all.pred$hwidth/ all.pred$DOC_umol.L
+#all.pred$tmax.DOCumol <- all.pred$tmax / all.pred$DOC_umol.L
+#all.pred$hwidth.DOCumol <- all.pred$hwidth/ all.pred$DOC_umol.L
 
 all.pred$dmax.hauc <- all.pred$dmax/all.pred$hauc
 
@@ -109,28 +109,33 @@ all.pred$H <- 10^(-all.pred$pH_lab)
 all.pred$CN <- all.pred$DOC/all.pred$DN
 all.pred$CP <- all.pred$DOC/all.pred$DP
 
+
 #Altitude Langtjern
 all.pred[grep("13763",all.pred$Sample_ID),which(names(all.pred) == "Altitude")] <- 516
 
+#change names
+names(all.pred)[which(names(all.pred)=="dmax")] <- "Vmax"
+names(all.pred)[which(names(all.pred)=="hauc")] <- "LOC"
+names(all.pred)[which(names(all.pred)=="hwidth")] <- "BdgT"
+names(all.pred)[which(names(all.pred)=="dmax.hauc")] <- "Vmax.LOC"
+names(all.pred)[which(names(all.pred)=="dmax.DOCumol")] <- "Vmax.DOC"
+names(all.pred)[which(names(all.pred)=="LOC.DOC")] <- "LOC.DOC"
+
+
+
 write.csv(all.pred,"5. 100 lakes/all.parameters.csv")
+write_xlsx(all.pred,"5. 100 lakes/all.parameters.xlsx")
 
 # SELECT DATA: waterchem -----
 
 all.pred <- read.csv("5. 100 lakes/all.parameters.csv")
 
 #removes duplicates (see "200330_duplicates") -----
-sel <- c("Sample_ID","hauc","tmax","hwidth","dmax","dmax.hauc","dmax.DOCumol","hauc.DOCumol","lag_bdg", "temp","long","lat","week","pH_lab","H",
-         "cond_µS.m","alk_meq.L",
-         "TOC","TN","TP","DOC","DN","DP",
-         "O2_µM", "N2_µM","CO2_µM","CH4_nM","N2O_nM","O2_nM.h","N2_nM.h","CO2_nM.h","CH4_nM.h","N2O_nM.h",
-         "NVE_number","DNA_ug.mL","filtered_mL","cells_counts.mL",
-         "Fluoride_mg.L","Chloride_mg.L","Nitrite_mg.L","Bromide_mg.L","Sulfate_mg.L","Nitrate_mg.L",
-         "Cr52","Ni58","Cu63","Zn64","As75","Cd114","Pb208","V51","Mn55","Co59",
-         "abs254","abs410","SUVA","SAR","s_275_295","s_350_400","SR",
-         "Altitude","Lake_Area","Ca","Mg","Na","K","Fe","Al","Al_R","Al_Il","Ca_NIVA","Na_NIVA")
-waterchem <- all.pred[sel]
-waterchem$Sample_ID <- as.numeric(waterchem$Sample_ID)
+waterchem <- all.pred %>% select(-c("ox_initial","pH_sampling","cond.","alk.mLHCL","Sted",
+                                    "pH_om","kond.","DNAsampleID","filtered_mL","Lake_name","X",
+                                    "auc","width","tmax_h"))
 write.csv(waterchem,"5. 100 lakes/waterchem.csv")
+write_xlsx(waterchem,"5. 100 lakes/waterchem.xlsx")
 
 # outliers -----
 propTOC <- (all.pred$TOC-all.pred$abs254)
@@ -163,4 +168,4 @@ names(lakes70) <- c("Sample_ID","LOC","tmax","BdgT","Vmax","Vmax.LOC","Vmax.DOC"
                     "F","Cl","NO2","Br","SO4","NO3","Cr","Ni","Cu","Zn","As","Cd","Pb","V","Mn","Co",
                     "abs254","abs5410","SUVA","SAR","s_275_295","s_350_400","SR",
                     "Altitude","Lake_area","Ca","Mg","Na","K","Fe","Al","Al_NIVA","Ca_NIVA","Na_NIVA")
-
+write.csv(lakes70,"5. 100 lakes/lakes70.csv")

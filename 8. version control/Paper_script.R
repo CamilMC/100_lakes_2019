@@ -4,6 +4,7 @@ library("sf")
 library("ggrepel")
 library("dplyr")
 library(writexl)
+library(readxl)
 library(ggplot2)
 
 library(dendextend)
@@ -25,9 +26,7 @@ lakes70 <- read.csv("5. 100 lakes/lakes70.csv")
 useless.params <- c("X","NVE_number","DNA_ug.mL","filtered_mL","SAR","s_350_400",
                     "Lake_Area","ionic_strength_.mol.L","cluster","Al","CO2_nM.h","N2_nM.h","O2_nM.h","CH4_nM.h","N2O_nM.h",
                     "TCN","TCP","week")
-lakes70$log.Vmax <- log(lakes70$Vmax)
-lakes70$log.Vmaxs <- log(lakes70$Vmax.DOC)
-
+source("8. version control/bacteria.R")
 
 
 # maps -----
@@ -116,7 +115,7 @@ ggplot()+geom_sf(data=norgemap)+
   scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(1,20))+
 #  geom_text(data=filter(lakes70,DOC > 15),aes(x=long,y=lat,label=round(DOC,1)),nudge_y = -0.1,nudge_x = -0.0)+ 
   guides(color=guide_legend(order=1),size = guide_legend(order=2))+
-  theme(legend.position = c(.9,.6))+
+  theme(legend.position = c(.75,.2))+
   xlim(5,15)+ylim(58,63)
 
 dev.off()
@@ -191,12 +190,12 @@ ggplot(lakes70,aes(y=log.Vmaxs,x=cluster))+geom_boxplot(aes(group=cluster),outli
 dev.off()
 
 ggplot()+geom_sf(data=norgemap)+
-  geom_point(data=lakes70,aes(x=long,y=lat,col=as.character(cluster)),size=5)+
-  theme_void(base_size = 24)+labs(x="",y="",col="cluster")+
+  geom_point(data=lakes70,aes(x=long,y=lat,col=as.character(cluster)),size=6)+
+  theme_void(base_size = 26)+labs(x="",y="",col="cluster")+
   scale_color_manual(values=colors_cluster)+
-  theme(legend.position = c(.87,.45))+
+  theme(legend.position = c(.75,.15))+
   xlim(5,15)+ylim(58,63)
-ggsave("5. 100 lakes/map_clusters.png",width=10,height = 12)
+ggsave("5. 100 lakes/map_clusters.png",width=10,height = 10)
 
 hist(lakes70$log.Vmax)
 
@@ -343,7 +342,8 @@ x <- c("temperature","Al","SUVA","Fe","CH4","Cl","Co","Cu",
        "DN","Mg","K",
        "Alkalinity","Conductivity","CO2","TN","TP","SO4","DP",
       "Ca","cells",
-      "O2","tmax","Vmax")
+      "O2","tmax","Vmax",
+      "dist_bact")
 x.graph <- x[x %in% pwt.graph$param]
 
 ggplot(pwt.graph,aes(y=param))+geom_point(aes(x=pwt12,col="12",shape=pvalue),size=5)+
@@ -499,19 +499,21 @@ print.cor.signif2(lakes70,"DOC")
 
 pdf("5. 100 lakes/Vmax_corr.pdf",height = 10,width=15)
 cor_param_Vmax <- c("Sample_ID","LOC","Vmax","CN","CP") 
-cor_Vmax <- lakes70[cor_param_Vmax] %>% setNames(c("Sample_ID","LOC","Biodeg","C:N","C:P"))
-print.cor.signif2(cor_Vmax,"Biodeg",title=F,y1=-0.5)
+cor_Vmax <- lakes70[cor_param_Vmax] %>% setNames(c("Sample_ID","LOC","Vmax","C:N","C:P"))
+print.cor.signif2(cor_Vmax,"Vmax",title=F,y1=-0.5)
 
-cor_param_Vmax.DOC <- c("Sample_ID","LOC","Vmax","s_275_295","SR","DN","Al_R","SUVA","DOC","Vmax.DOC","LOC.DOC")
-cor_Vmax.DOC <- lakes70[cor_param_Vmax.DOC] %>% setNames(c("Sample_ID","LOC","Biodeg","s_275_295","SR","DN","Al","SUVA","DOC","Biodeg_s","%DOM"))
-print.cor.signif2(cor_Vmax.DOC,"Biodeg_DOC",title=F,y1=-0.5)
+cor_param_Vmax.DOC <- c("Sample_ID","LOC","Vmax","s_275_295","SR","DN","Al_NIVA","SUVA","DOC","Vmax.DOC","LOC.DOC")
+cor_Vmax.DOC <- lakes70[cor_param_Vmax.DOC] %>% setNames(c("Sample_ID","LOC","Vmax","s_275_295","SR","DN","Al","SUVA","DOC","Vmax/DOC","%DOM"))
+print.cor.signif2(cor_Vmax.DOC,"Vmax/DOC",title=F,y1=-0.5)
 print.cor.signif2(cor_Vmax.DOC,"%DOM",title=F,y1=-0.5,y2=1.3)
 
-cor_param_Vmax.LOC <- c("Sample_ID","Al_R","Mg","K","DN","alk_meq.L","pH_lab","Vmax.LOC","CN")
-cor_Vmax.LOC <- lakes70[cor_param_Vmax.LOC] %>% setNames(c("Sample_ID","Al","Mg","K","DN","alkalinity","pH","Biodeg_LOC","C:N"))
-print.cor.signif2(cor_Vmax.LOC,"Biodeg_LOC",title = F,y1=-0.7,y2=0.5)
+cor_param_Vmax.LOC <- c("Sample_ID","Al_NIVA","Mg","K","DN","alkalinity","pH","Vmax.LOC","CN")
+cor_Vmax.LOC <- lakes70[cor_param_Vmax.LOC] %>% setNames(c("Sample_ID","Al","Mg","K","DN","alkalinity","pH","Vmax/LOC","C:N"))
+print.cor.signif2(cor_Vmax.LOC,"Vmax/LOC",title = F,y1=-0.7,y2=0.5)
 
-
+cor_param_DOC <- c("DOC","TOC","V","Al","SUVA","Cu","Na","Fe","Co","Pb","Zn","cells","Br","DN","TN","CP","CN","K","conductivity","Ni","Mg","CH4","Vmax.DOC","LOC.DOC","temperature","SR","pH","Altitude")
+cor_DOC <- lakes70[cor_param_DOC]
+print.cor.signif2(cor_DOC,"DOC",title = F)
 
 dev.off()
 
@@ -520,9 +522,9 @@ pca_params <- c("Altitude","pH","SR","Vmax.LOC","DN","SUVA","DOC","alkalinity","
 lakes70pca <- lakes70[pca_params]
 pca70lakes <- prcomp(~.,data=lakes70pca,scale.=T,center=T)
 pcafviz <- fviz_pca_biplot(pca70lakes, repel=T,label = "var",col.var = "contrib",col.ind = "contrib",
-                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=5,title="")+ theme_light(base_size=20) 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ theme_light(base_size=24) 
 pcafviz23 <- fviz_pca_biplot(pca70lakes, axes = c(2,3),repel=T,label = "var",col.var = "contrib",col.ind = "contrib",
-                             gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=5,title="")+ theme_light(base_size=20) 
+                             gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ theme_light(base_size=24) 
 plot(pcafviz)
 ggsave("5. 100 lakes/Biodeg_pca.png",height = 8, width = 10)
 
@@ -590,4 +592,19 @@ for (i in names(lakes70)){
 }
 
 dev.off()
+
+
+
+# extra plots ----
+
+
+ggplot(lakes70,aes(x=DOC,y=Vmax.LOC))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
+ggplot(lakes70,aes(x=DN,y=Vmax.LOC))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
+ggplot(lakes70,aes(x=CN,y=Vmax.LOC))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
+ggplot(lakes70,aes(x=pH,y=Vmax.LOC))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
+
+
+ggplot(lakes70,aes(x=DOC,y=Vmax))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
+ggplot(lakes70,aes(x=DN,y=Vmax))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
+ggplot(lakes70,aes(x=CN,y=Vmax))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
 

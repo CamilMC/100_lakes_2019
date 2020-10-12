@@ -157,7 +157,7 @@ fviz_nbclust(lakes70_scaled, kmeans, method = "gap_stat")
 
 
 # creates clusters ----
-nb_clusters <- 3
+nb_clusters <- 4
 lakes70$cluster <- cutree(dend70c,nb_clusters)
 colors_cluster <- viridis(nb_clusters,end = 0.8,direction = -1)
 
@@ -180,12 +180,6 @@ ggplot(lakes70,aes(y=Vmax,x=cluster))+geom_boxplot(aes(group=cluster),outlier.sh
   scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=26)+ylab("Vmax")
 ggplot(lakes70,aes(y=Vmax.DOC,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
   scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=26)+ylab("Vmax/DOC")
-
-ggplot(lakes70,aes(y=log.Vmax,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
-  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=20)+ylab("log Vmax")
-ggplot(lakes70,aes(y=log.Vmaxs,x=cluster))+geom_boxplot(aes(group=cluster),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
-  scale_color_viridis_c(direction = -1,end=0.9)+theme_light(base_size=20)+ylab("log Vmax/DOC")
-
 
 dev.off()
 
@@ -289,7 +283,7 @@ ggsave("5. 100 lakes/cluster_difference.png",height = 15,width = 10)
 
 # Kruskal Wallis -----
 
-k1 <- kruskal.test(Vmax~cluster,data=lakes70)
+k1 <- kruskal.test(DOC~cluster,data=lakes70)
 pwt <- pairwise.wilcox.test(lakes70$Vmax,lakes70$cluster,p.adjust.method = "holm")
 
 kw_summary <- as.data.frame(names(lakes70))

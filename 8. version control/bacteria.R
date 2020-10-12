@@ -88,10 +88,9 @@ ggplot(bacteria73_sorted_long,aes(y=as.character(Lake_ID),x=value,fill=Class))+g
 ggplot(filter(bacteria73_sorted_long,Lake_ID == 13763))+geom_col(aes(x=Class,y=value))
 
 
-bact13763 <- bacteria73 %>% filter(Lake_ID == 13763)
-bact_order <- bact13763[order(bact13763$value,decreasing = T),] %>% select("Class") %>% as.factor()
-bact13763$Class <- as.factor(bact13763$Class)
-ggplot(bact13763,aes(x=reorder(Class,bact_order),y=value))+geom_col()+theme(axis.text.x = element_text(angle=90))
+bact13763 <- bacteria73 %>% filter(Lake_ID == 13763) %>% arrange(desc(value))
+ggplot(bact13763,aes(x=Class,y=value,fill=value))+geom_col(show.legend = F)+theme_light()+theme(axis.text.x = element_text(angle=90))+
+  scale_x_discrete(limits=bact13763$Class)+scale_fill_viridis_c(direction = -1)
 
 
 x=reorder(predictor,order(df3[-1,]$corr,decreasing=T))

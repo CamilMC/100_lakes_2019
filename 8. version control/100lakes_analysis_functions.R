@@ -233,7 +233,7 @@ print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1){
 }
 
 # plot.radar ----
-#plot radar of the outliers for one parameter
+# plot radar of the outliers for one parameter -----
 
 plot.radar <- function(outlier_df,param){
   
@@ -271,7 +271,7 @@ plot.radar2 <- function(outlier_df,param){
 
 
 # myplot -----
-# plots comparisons
+# plots comparisons -----
 myplot <- function (xvar,yvar,data,lab.x = xvar,lab.y = yvar){
   
   lmxy <- lm(data[,yvar]~data[,xvar]) %>% summary()

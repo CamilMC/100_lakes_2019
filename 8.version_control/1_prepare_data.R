@@ -1,49 +1,16 @@
 library(readxl)
 library("janitor")
+
 # LOAD DATA -----
 
-RR100s <- read.csv("4. Respiration rate/RR100s.csv")
+RR100s <- read.csv("4.Respiration_rate/RR100s.csv")
 RR100s <- RR100s[,-1]
 RR100s$incub_date <- as.Date(as.character(RR100s$incub_date),"%y%m%d")
 #RR100s$Sample_ID <- as.character(RR100s$Sample_ID)
 bdgp <- names(RR100s)
 
-#TOC data
-om_data <- read_xlsx("5. 100 lakes/om_data.xlsx")
-
-#sampling data
-lake_data <- read_xlsx("5. 100 lakes/100LakesData.xlsx",col_types = c("text","text","numeric","numeric","numeric","numeric","numeric","date","numeric"))
-lake <- lake_data[!duplicated(lake_data$lake_id),]
-
-#absorbance data
-abs_data <- read_xlsx("5. 100 lakes/100lakes_all_absorbances.xlsx")
-abs <- abs_data %>% filter(WL.nm==254) %>% t() %>% as.data.frame() %>% tibble::rownames_to_column() %>% filter(rowname != "WL.nm") %>% setNames(c("lake_ID","abs254"))
-abs$abs254 <- as.numeric(abs$abs254)
-abs$abs410 <- abs_data %>% filter(WL.nm==410) %>% t() %>% row_to_names(row_number = 1) %>% as.numeric()
-
-# spectral slopes
-
-s_275_295 <- getslope(abs_data,275,295)
-s_350_400 <- getslope(abs_data,350,400)
-
-#bacterial data
-
-dna <- read_xlsx("5. 100 lakes/100lakes_DNA.xlsx", col_types = c("text","text","numeric","text","numeric","numeric","numeric"))
-
-#gas data
-conc_gas <- read_xlsx("5. 100 lakes/100Lakes_gases_conc_rates.xlsx",col_types = c("text","skip","skip","skip","skip","skip","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric"))
-
-#water chemistry data
-chem_data <- read_xlsx("5. 100 lakes/100lakes_chemistry.xlsx",col_types = c("skip","skip","text","skip","numeric","numeric","numeric","numeric","numeric","skip"))
-
-#anion data
-anion_data <- read_xlsx("5. 100 lakes/100lakes_anions.xlsx",col_types = c("skip","text","numeric","numeric","numeric","numeric","numeric","numeric","numeric")) 
-
-# trace metals
-tm_data <- read_xlsx("5. 100 lakes/100lakes_ICPMS.xlsx",sheet = "Sheet3")
-
-#cations
-bcations <- read_xlsx("5. 100 lakes/100lakes_base_cations.xlsx",col_types = c("text","numeric","numeric","numeric","numeric","numeric","numeric"))
+# CBA data
+cba100lakes <- read_xlsx("CBA100lakes_Master.xlsx")
 
 #niva data
 niva100 <- read.csv("7. 1000 lakes/niva1000.csv") %>% select(-c("dmax","hauc","hwidth","tmax","lag_bdg","Latitude","Longitude")) %>% distinct()
@@ -63,79 +30,38 @@ emptylakes <-  missinglakes %>% cbind(matrix(data = NA, nrow = dim(missinglakes)
 
 niva100 <- rbind(niva100, emptylakes)
 
-#MPAES
-mpaes <- read_xlsx("5. 100 lakes/100lakes_MPAES.xlsx",sheet = "Summary_MPAES",
-                   col_types = "numeric") %>%
-      select(c("Sample","Ca","Na","Mg","K","Al","Fe"))
 
+# MERGE DATAFRAME -----
 
-# MERGE DATAFRAME - all.pred -> all.parameters.csv -----
+rr100lakes <- merge(RR100s, cba100lakes, by.x = "Sample_ID",by.y = "Lake_ID")
+rr100lakes$lag_bdg <- difftime(rr100lakes$incub_date,rr100lakes$date,units = "days") %>% as.numeric()
 
-all.pred <- RR100s[,bdgp] %>% merge(lake,by.x="Sample_ID",by.y="lake_id") %>%
-  merge(chem_data,by.x="Sample_ID",by.y="Lake_ID") %>% 
-  merge(om_data,by.x="Sample_ID",by.y="ID") %>% 
-  merge(abs,by.x="Sample_ID",by.y="lake_ID")%>%
-  merge(s_275_295,by.x = "Sample_ID", by.y = "Lake_ID") %>% 
-  merge(s_350_400, by.x = "Sample_ID", by.y = "Lake_ID") %>% 
-  merge(dna, by.x = "Sample_ID", by.y = "Lake_ID") %>%
-  merge(conc_gas, by.x = "Sample_ID", by.y = "Lake_ID") %>% merge(anion_data,by.x = "Sample_ID",by.y="ID") %>% 
-  merge(tm_data,by.x = "Sample_ID",by.y = "ID") %>%
-  merge(bcations,by.x = "Sample_ID", by.y = "Sample_ID") %>% 
-  merge(niva100, by.x = "Sample_ID", by.y = "Sample_ID") %>%
-  merge(mpaes, by.x = "Sample_ID", by.y = "Sample")
+rr100lakes$DOC_umol <- rr100lakes$DOC/12 * 10^(3)
+rr100lakes$hauc.DOCumol <- rr100lakes$hauc/rr100lakes$DOC_umol
+rr100lakes$dmax.DOCumol <- rr100lakes$dmax/rr100lakes$DOC_umol
 
-all.pred$lag_bdg <- difftime(all.pred$incub_date,all.pred$date,units = "days") %>% as.numeric()
-all.pred$SUVA <- all.pred$abs254/(all.pred$TOC*0.90)
-all.pred$abs410[all.pred$abs410 <= 0 ] <- NA
-all.pred$SAR <- all.pred$abs254/all.pred$abs410
-all.pred$s_350_400[all.pred$s_350_400 <= 0 ] <- NA
-all.pred$SR <- all.pred$s_275_295/all.pred$s_350_400
+rr100lakes$dmax.hauc <- rr100lakes$dmax/rr100lakes$hauc
 
-#all.pred$hauc.DOC <- all.pred$hauc/all.pred$DOC
-#all.pred$dmax.DOC <- all.pred$dmax/all.pred$DOC
-#all.pred$tmax.DOC <- all.pred$tmax / all.pred$DOC
-#all.pred$hwidth.DOC <- all.pred$hwidth/ all.pred$DOC
+rr100lakes$H <- 10^(-rr100lakes$pH_lab)
 
-all.pred$DOC_umol.L <- all.pred$DOC/12 * 10^(3)
-all.pred$hauc.DOCumol <- all.pred$hauc/all.pred$DOC_umol.L
-all.pred$dmax.DOCumol <- all.pred$dmax/all.pred$DOC_umol.L
-#all.pred$tmax.DOCumol <- all.pred$tmax / all.pred$DOC_umol.L
-#all.pred$hwidth.DOCumol <- all.pred$hwidth/ all.pred$DOC_umol.L
-
-all.pred$dmax.hauc <- all.pred$dmax/all.pred$hauc
-
-all.pred$H <- 10^(-all.pred$pH_lab)
-
-all.pred$CN <- all.pred$DOC/all.pred$DN
-all.pred$CP <- all.pred$DOC/all.pred$DP
+rr100lakes$CN <- rr100lakes$DOC_umol/(rr100lakes$DN/14.007*10^6)
+rr100lakes$CP <- rr100lakes$DOC_umol/(rr100lakes$DP/30.97*10^6)
 
 
 #Altitude Langtjern
-all.pred[grep("13763",all.pred$Sample_ID),which(names(all.pred) == "Altitude")] <- 516
+rr100lakes[grep("13763",rr100lakes$Sample_ID),which(names(rr100lakes) == "Altitude")] <- 516
 
 #change names
-names(all.pred)[which(names(all.pred)=="dmax")] <- "Vmax"
-names(all.pred)[which(names(all.pred)=="hauc")] <- "LOC"
-names(all.pred)[which(names(all.pred)=="hwidth")] <- "BdgT"
-names(all.pred)[which(names(all.pred)=="dmax.hauc")] <- "Vmax.LOC"
-names(all.pred)[which(names(all.pred)=="dmax.DOCumol")] <- "Vmax.DOC"
-names(all.pred)[which(names(all.pred)=="LOC.DOC")] <- "LOC.DOC"
+names(rr100lakes)[which(names(rr100lakes)=="dmax")] <- "Biodeg"
+names(rr100lakes)[which(names(rr100lakes)=="hauc")] <- "BDOC"
+names(rr100lakes)[which(names(rr100lakes)=="hwidth")] <- "BdgT"
+names(rr100lakes)[which(names(rr100lakes)=="dmax.hauc")] <- "Biodeg.BDOC"
+names(rr100lakes)[which(names(rr100lakes)=="dmax.DOCumol")] <- "Biodeg.DOC"
+names(rr100lakes)[which(names(rr100lakes)=="LOC.DOC")] <- "BDOC.DOC"
 
+write.csv(rr100lakes,"8.version_control/rr100lakes.csv")
+write_xlsx(rr100lakes,"8.version_control/rr100lakes.xlsx")
 
-
-write.csv(all.pred,"5. 100 lakes/all.parameters.csv")
-write_xlsx(all.pred,"5. 100 lakes/all.parameters.xlsx")
-
-# SELECT DATA: waterchem -----
-
-all.pred <- read.csv("5. 100 lakes/all.parameters.csv")
-
-#removes duplicates (see "200330_duplicates") -----
-waterchem <- all.pred %>% select(-c("ox_initial","pH_sampling","cond.","alk.mLHCL","Sted",
-                                    "pH_om","kond.","DNAsampleID","filtered_mL","Lake_name","X",
-                                    "auc","width","tmax_h"))
-write.csv(waterchem,"5. 100 lakes/waterchem.csv")
-write_xlsx(waterchem,"5. 100 lakes/waterchem.xlsx")
 
 # outliers -----
 propTOC <- (all.pred$TOC-all.pred$abs254)

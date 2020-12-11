@@ -12,7 +12,7 @@ bdgp <- names(RR100s)
 # CBA data
 cba100lakes <- read_xlsx("CBA100lakes_Master.xlsx")
 
-#niva data
+#niva data -----
 niva100 <- read.csv("7. 1000 lakes/niva1000.csv") %>% select(-c("dmax","hauc","hwidth","tmax","lag_bdg","Latitude","Longitude")) %>% distinct()
 names(niva100)[which(names(niva100)=="Ca")] <- "Ca_NIVA"
 names(niva100)[which(names(niva100)=="Na")] <- "Na_NIVA"
@@ -47,7 +47,7 @@ rr100lakes$H <- 10^(-rr100lakes$pH)
 rr100lakes$CN <- rr100lakes$DOC_umol/(rr100lakes$DN/14.007*10^6)
 rr100lakes$CP <- rr100lakes$DOC_umol/(rr100lakes$DP/30.97*10^6)
 
-rr100lakes$s_350_400[which(rr100lakes$s_350_400 == 0)] <- 0.000001
+rr100lakes$s_350_400[which(rr100lakes$s_350_400 == 0)] <- 0.001
 rr100lakes$SR <- rr100lakes$s_275_295/rr100lakes$s_350_400
 
 #Altitude Langtjern

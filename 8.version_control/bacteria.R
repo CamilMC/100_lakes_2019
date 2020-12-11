@@ -1,5 +1,5 @@
 # load bacteria data
-seq_asv <- read_xlsx("5. 100 lakes/bacteria_100Lakes.xlsx")
+seq_asv <- read_xlsx("5.100_lakes/bacteria_100Lakes.xlsx")
 
 # vector with class names
 bacteria_class <- unique(seq_asv$Class)
@@ -26,7 +26,7 @@ bacteria_lakes$DNAsampleID <- NA
 bacteria_lakes$DNAsampleID <- rownames(seq_asv_t2)
 
 #matches with Lake_ID
-key <- read_xlsx("5. 100 lakes/bacteria_100Lakes.xlsx",sheet="key") %>% select(c("Lake_ID","DNAsampleID"))
+key <- read_xlsx("5.100_lakes/bacteria_100Lakes.xlsx",sheet="key") %>% select(c("Lake_ID","DNAsampleID"))
 bacteria_lakes_filtered <- dplyr::filter(bacteria_lakes,DNAsampleID != setdiff(bacteria_lakes$DNAsampleID,key$DNAsampleID))
 bacteria_73lakes <- merge(key,bacteria_lakes_filtered,by.x="DNAsampleID",by.y="DNAsampleID")
 bacteria_73lakes$DNAsampleID <- NULL

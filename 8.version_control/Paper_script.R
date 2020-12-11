@@ -73,6 +73,55 @@ ggplot()+geom_sf(data=norgemap)+
 ggplot(lakes73)+geom_point(aes(x=DOC,y=Biodeg,col=trophic))
 ggplot(lakes73)+geom_point(aes(x=SUVA,y=Biodeg,col=trophic))
 ggplot(lakes73)+geom_point(aes(x=SR,y=Biodeg,col=trophic))
+ggplot(lakes73)+geom_point(aes(x=DN,y=Biodeg,col=trophic))
+ggplot(lakes73)+geom_point(aes(x=DP,y=Biodeg,col=trophic))
+ggplot(lakes73)+geom_point(aes(x=DN+DP,y=Biodeg,col=trophic))
+ggplot(lakes73)+geom_point(aes(x=DN+DP,y=DOC,col=trophic))
+ggplot(lakes73)+geom_point(aes(x=CP,y=Biodeg,col=trophic))
+ggplot(lakes73)+geom_point(aes(x=CN,y=Biodeg,col=trophic))
+
+
+
+ggplot()+geom_sf(data=norgemap)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=trophic),size=4)+
+  geom_point(data=filter(lakes73,Biodeg > 10),aes(x=Long,y=Lat,col=trophic),size = 6)+
+  theme_void(base_size = 26)+labs(x="",y="",col="trophic")+
+  scale_color_manual(values=colors_cluster)+
+  theme(legend.position = c(.75,.15))+
+  xlim(5,15)+ylim(58,63)
+
+pca_params <- c("pH","Biodeg","DN","SUVA","DOC","DP","alkalinity","Ca","CN","CP","Fe")
+pca_params <- c("pH","Biodeg","TN","TP","SUVA","DOC","alkalinity","CN","CP","Fe")
+
+lakes73num <- lakes73 %>% select(!c("X","Lake_ID","DNAsampleID","NIVA_station_ID","NVE_number","Lake_name","CBA_sample_date","NIVA_sample_date","SARvis","Survey","incub_date","trophic","DNOM","nuts")) %>% sapply(as.numeric) %>% as.data.frame()
+
+lakes73pca <- lakes73[pca_params]
+
+lakes73pca <- lakes73num %>% fill.na()
+
+pca73lakes <- prcomp(~.,data=lakes73pca,scale.=T,center=T)
+pcafviz <- fviz_pca_biplot(pca73lakes, repel=T,label = "var",col.var = "contrib",col.ind = "contrib",
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ theme_light(base_size=24) 
+pcafviz23 <- fviz_pca_biplot(pca73lakes, axes = c(2,3),repel=T,label = "var",col.var = "contrib",col.ind = "contrib",
+                             gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ theme_light(base_size=24) 
+plot(pcafviz)
+plot(pcafviz23)
+
+lakes8pca <- lakes73num %>% fill.na() %>% filter(Biodeg > 10) %>% select(!c("p_N2","p_O2","Ca","Na","Cl","DOC_umol","a400","Lat","conductivity","c_CO2","DN","DNA_ug.mL","c_O2","pH_bio","pH","Mg","a600","hauc.DOCumol","PO4","SARuv","SR"))
+
+pca8lakes <- prcomp(~.,data=lakes8pca,scale.=T,center=T)
+pcafviz <- fviz_pca_biplot(pca8lakes, repel=T,label = "var",col.var = "contrib",col.ind = "contrib",
+                           select.var = list(contrib = 15), 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ theme_light(base_size=24) 
+plot(pcafviz)
+
+pcafviz23 <- fviz_pca_biplot(pca8lakes, axes = c(2,3),repel=T,label = "var",col.var = "contrib",col.ind = "contrib",
+                             select.var = list(contrib = 15),
+                             gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ theme_light(base_size=24) 
+plot(pcafviz23)
+
+cor(lakes73num) %>% corrplot::corrplot(method = c("number"),type=c("upper"),order=c("hclust"))
+
 
 # maps -----
 

@@ -33,8 +33,8 @@ niva100 <- rbind(niva100, emptylakes)
 
 # MERGE DATAFRAME -----
 
-rr100lakes <- merge(RR100s, cba100lakes, by.x = "Sample_ID",by.y = "Lake_ID")
-rr100lakes$lag_bdg <- difftime(rr100lakes$incub_date,rr100lakes$date,units = "days") %>% as.numeric()
+rr100lakes <- merge(cba100lakes, RR100s, by.y = "Sample_ID",by.x = "Lake_ID")
+rr100lakes$lag_bdg <- difftime(rr100lakes$incub_date,rr100lakes$CBA_sample_date,units = "days") %>% as.numeric()
 
 rr100lakes$DOC_umol <- rr100lakes$DOC/12 * 10^(3)
 rr100lakes$hauc.DOCumol <- rr100lakes$hauc/rr100lakes$DOC_umol
@@ -42,11 +42,13 @@ rr100lakes$dmax.DOCumol <- rr100lakes$dmax/rr100lakes$DOC_umol
 
 rr100lakes$dmax.hauc <- rr100lakes$dmax/rr100lakes$hauc
 
-rr100lakes$H <- 10^(-rr100lakes$pH_lab)
+rr100lakes$H <- 10^(-rr100lakes$pH)
 
 rr100lakes$CN <- rr100lakes$DOC_umol/(rr100lakes$DN/14.007*10^6)
 rr100lakes$CP <- rr100lakes$DOC_umol/(rr100lakes$DP/30.97*10^6)
 
+rr100lakes$s_350_400[which(rr100lakes$s_350_400 == 0)] <- 0.000001
+rr100lakes$SR <- rr100lakes$s_275_295/rr100lakes$s_350_400
 
 #Altitude Langtjern
 rr100lakes[grep("13763",rr100lakes$Sample_ID),which(names(rr100lakes) == "Altitude")] <- 516

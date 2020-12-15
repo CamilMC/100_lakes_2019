@@ -47,19 +47,19 @@ rr100lakes$H <- 10^(-rr100lakes$pH)
 rr100lakes$CN <- rr100lakes$DOC_umol/(rr100lakes$DN/14.007*10^6)
 rr100lakes$CP <- rr100lakes$DOC_umol/(rr100lakes$DP/30.97*10^6)
 
-rr100lakes$s_350_400[which(rr100lakes$s_350_400 == 0)] <- 0.001
+rr100lakes$s_350_400[which(rr100lakes$s_350_400 == 0)] <- NA
 rr100lakes$SR <- rr100lakes$s_275_295/rr100lakes$s_350_400
 
 #Altitude Langtjern
 rr100lakes[grep("13763",rr100lakes$Sample_ID),which(names(rr100lakes) == "Altitude")] <- 516
 
 #change names
-names(rr100lakes)[which(names(rr100lakes)=="dmax")] <- "Biodeg"
-names(rr100lakes)[which(names(rr100lakes)=="hauc")] <- "BDOC"
-names(rr100lakes)[which(names(rr100lakes)=="hwidth")] <- "BdgT"
-names(rr100lakes)[which(names(rr100lakes)=="dmax.hauc")] <- "Biodeg.BDOC"
-names(rr100lakes)[which(names(rr100lakes)=="dmax.DOCumol")] <- "Biodeg.DOC"
-names(rr100lakes)[which(names(rr100lakes)=="LOC.DOC")] <- "BDOC.DOC"
+names(rr100lakes)[which(names(rr100lakes)=="dmax")] <- "RR" # respiration rate, max speed of oxygen consumption
+names(rr100lakes)[which(names(rr100lakes)=="hauc")] <- "OD" # oxygen demand = amount of O2 consumed
+names(rr100lakes)[which(names(rr100lakes)=="hwidth")] <- "BdgT" # length of the growth phase
+names(rr100lakes)[which(names(rr100lakes)=="dmax.hauc")] <- "RR.OD"
+names(rr100lakes)[which(names(rr100lakes)=="dmax.DOCumol")] <- "RR.DOCumol"
+names(rr100lakes)[which(names(rr100lakes)=="LOC.DOC")] <- "OD.DOC"
 
 write.csv(rr100lakes,"8.version_control/rr100lakes.csv")
 write_xlsx(rr100lakes,"8.version_control/rr100lakes.xlsx")

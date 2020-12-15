@@ -87,8 +87,8 @@ plot.cor <- function(df,param,lim=c(-1,1)){
     theme_bw(base_size=20)+
     theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank())+
     scale_fill_gradient(high="red",low="skyblue")+ylim(lim)+labs(x="",y=paste(name_df,param,sep="."),fill="correlation")
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),values = c(0,0.01,0.05,1),
-                       breaks = c(0,0.01,0.05,1),labels = c("0","0.01","0.05","1"),limits = c(0,1), guide="legend")+
+  #scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),values = c(0,0.01,0.05,1),
+   #                    breaks = c(0,0.01,0.05,1),labels = c("0","0.01","0.05","1"),limits = c(0,1), guide="legend")+
     print(g)
   ggsave(plot = g, filename = paste("cor",name_df,param,"png",sep="."),device ="png",width=15,height=10)
 }

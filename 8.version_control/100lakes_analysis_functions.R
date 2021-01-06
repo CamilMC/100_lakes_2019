@@ -167,9 +167,9 @@ print.cor.signif <- function(df,param,title = T){
   name_df <- paste(deparse(substitute(df)),param,sep=".")
   
   # correlation table with p values
-  cor.param <-data.frame(predictor = rep(NA,length(names(df2)[-1])))
-  cor.param$predictor <- names(df2)[-1] %>% as.vector()
-  cor.param$corr <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]])$estimate)
+  cor.param <-data.frame(predictor = rep(NA,length(names(df2))))
+  cor.param$predictor <- names(df2) %>% as.vector()
+  cor.param$corr <- sapply(cor.param, function(x) cor.test(df2[[param]],df2[[x]])$estimate)
   cor.param$pvalue <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]])$p.value)
   cor.param <- cor.param[order(cor.param$corr, decreasing = T),]
   
@@ -179,7 +179,7 @@ print.cor.signif <- function(df,param,title = T){
     geom_col(aes(fill=pvalue))+ 
     geom_text(angle=90,hjust=0,nudge_y = 0.01,size=6)+
     theme_bw(base_size=20)+
-    theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+    theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = theme_line(colour = NA))+
     scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
                          breaks = c(0,0.01,0.05, 0.1),labels = c("0","0.01","0.05","0.1"),limits = c(0,0.1), 
                          guide="legend")+
@@ -205,8 +205,8 @@ print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1){
   name_df <- paste(deparse(substitute(df)),param,sep=".")
   
   # correlation table with p values
-  cor.param <-data.frame(predictor = rep(NA,length(names(df2)[-1])))
-  cor.param$predictor <- names(df2)[-1] %>% as.vector()
+  cor.param <-data.frame(predictor = rep(NA,length(names(df2))))
+  cor.param$predictor <- names(df2) %>% as.vector()
   cor.param$corr <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]])$estimate)
   cor.param$pvalue <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]])$p.value)
   cor.param <- cor.param[order(cor.param$corr, decreasing = T),]
@@ -217,16 +217,17 @@ print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1){
     geom_col(aes(fill=pvalue))+ 
     geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
     theme_bw(base_size=28)+
-    theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+    theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
     scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
                          breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
                          guide="legend")+
+    xlab("")+ylab("param")+
     ylim(y1,y2)
   if(title == T){
-    g <- g + labs(x="",y=name_df,fill="p-value")
+    g <- g + labs(x="", y=name_df, fill="p-value")
     print(g)
-  } else if(title == F){
-    g <- g + labs(x="",y=param,fill = "p-value")
+  } else {
+    g <- g + labs(x = "",y = param, title = title)
     print(g)
   }
   
@@ -294,3 +295,8 @@ fill.na <- function(df){
   }
   return(df)
 }
+
+# detects na
+ not_all_na <- function(x) any(!is.na(x))
+ not_any_na <- function(x) all(!is.na(x))
+ 

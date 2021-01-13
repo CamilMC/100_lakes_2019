@@ -160,7 +160,7 @@ print.cor <- function(df,param,title = T,cor_list = T){
 # only prints the significant correlations on the graph
 # returns graphs but does not change the list "all.correlations"
 
-print.cor.signif <- function(df,param,title = T){
+print.cor.signif <- function(df,param,title = T, meth = "pearson"){
   
   #save name of the dataframe as a character
   df2 <- df
@@ -169,8 +169,8 @@ print.cor.signif <- function(df,param,title = T){
   # correlation table with p values
   cor.param <-data.frame(predictor = rep(NA,length(names(df2))))
   cor.param$predictor <- names(df2) %>% as.vector()
-  cor.param$corr <- sapply(cor.param, function(x) cor.test(df2[[param]],df2[[x]])$estimate)
-  cor.param$pvalue <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]])$p.value)
+  cor.param$corr <- sapply(cor.param, function(x) cor.test(df2[[param]],df2[[x]], methode = meth )$estimate)
+  cor.param$pvalue <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]], methode = meth)$p.value)
   cor.param <- cor.param[order(cor.param$corr, decreasing = T),]
   
   #plot cor
@@ -198,7 +198,7 @@ print.cor.signif <- function(df,param,title = T){
 # only prints the significant correlations on the graph
 # returns graphs but does not change the list "all.correlations"
 
-print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1){
+print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1,meth = "pearson"){
   
   #save name of the dataframe as a character
   df2 <- df
@@ -207,8 +207,8 @@ print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1){
   # correlation table with p values
   cor.param <-data.frame(predictor = rep(NA,length(names(df2))))
   cor.param$predictor <- names(df2) %>% as.vector()
-  cor.param$corr <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]])$estimate)
-  cor.param$pvalue <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]])$p.value)
+  cor.param$corr <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]],method= meth )$estimate)
+  cor.param$pvalue <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]],method = meth )$p.value)
   cor.param <- cor.param[order(cor.param$corr, decreasing = T),]
   
   #plot cor

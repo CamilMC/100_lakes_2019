@@ -17,19 +17,26 @@ source("5.100_lakes/100lakes_analysis_functions.R")
 norgemap <- st_read("3.Maps/TM_WORLD_BORDERS-0.3.shp")
 source("8.version_control/bacteria.R")
 
-
-#load the world map
+# -----
+# load the world map -----
 
 library("rnaturalearth")
 library(rgeos)
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
+# -----
 # load data -----
 
-
 lakes73 <- read.csv("8.version_control/rr100lakes.csv")
+# ----
+# summary stats RR, BdgT and OD
+
+cor.test(lakes73$RR,lakes73$OD)[c("estimate","p.value")] 
+cor.test(lakes73$BdgT,lakes73$OD)[c("estimate","p.value")] 
+cor.test(lakes73$RR,lakes73$BdgT)[c("estimate","p.value")] 
 
 
+# ----
 # separation of eutrophic/oligotrophic/dystrophic lakes ------
 lakes73$DNOM <- NA
 for(i in 1:length(lakes73$TOC)){
@@ -87,7 +94,6 @@ ggplot()+geom_sf(data=norgemap)+
   xlim(5,15)+ylim(58,63)
 
 # -----
-
 # alternative sorting of trophic status -----
 
 lakes73$CNP <- lakes73$TOC/(lakes73$TN/lakes73$TP)
@@ -110,6 +116,47 @@ ggplot()+geom_sf(data=norgemap)+
   geom_point(data=lakes73,aes(x=Long,y=Lat,col=trophic),size=6)+
   theme_void(base_size = 26)+labs(x="",y="",col="trophic state")+
   scale_color_manual(values=colors_cluster)+
+  theme(legend.position = c(.8,.15))+
+  xlim(5,15)+ylim(58,62)
+
+# -----
+# alternative sorting of trophic status by P-----
+
+lakes73$DNOM <- NA
+for(i in 1:length(lakes73$TOC)){
+  if (lakes73$TOC[i] >= mean(lakes73$TOC)){
+    lakes73$DNOM[i] <- 1
+  } else {
+    lakes73$DNOM[i] <- 0
+  }
+}
+
+lakes73$nuts <- NA
+for(i in 1:length(lakes73$TP)){
+  if ((lakes73$TP[i]) > (mean(lakes73$TP))){
+    lakes73$nuts[i] <- 1
+  } else {
+    lakes73$nuts[i] <- 0
+  }
+}
+
+lakes73$trophic <- NA
+for (i in 1:length(lakes73$Lake_ID)){
+  if(lakes73$DNOM[i] == 0 & lakes73$nuts[i] == 1){
+    lakes73$trophic[i] <- "eu"
+  }else if(lakes73$DNOM[i] == 0 & lakes73$nuts[i] == 0){
+    lakes73$trophic[i] <- "oligo"
+  } else if(lakes73$DNOM[i] ==1 & lakes73$nuts[i] == 0){
+    lakes73$trophic[i] <- "dys" 
+  } else {
+    lakes73$trophic[i] <- "eu"
+  }
+}
+
+ggplot()+geom_sf(data=norgemap)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=trophic),size=6)+
+  theme_void(base_size = 26)+labs(x="",y="",col="trophic state")+
+  scale_color_manual(values=c("sienna","chartreuse4","skyblue3"))+
   theme(legend.position = c(.8,.15))+
   xlim(5,15)+ylim(58,62)
 
@@ -188,6 +235,11 @@ lakes65num <- lakes65 %>% sapply(as.numeric) %>% as.data.frame() %>% select_if(n
 lakes8 <- filter(lakes73,RR>10)
 lakes8num <- lakes8 %>% sapply(as.numeric) %>% as.data.frame() %>% select_if(not_any_na)
 
+# -----
+# distribution of data ----
+pdf("8.version_control/distribution.pdf")
+hist.df(lakes73num)
+dev.off()
 
 # -----
 # pca with all lakes -----
@@ -206,6 +258,7 @@ pcafviz23 <- fviz_pca_biplot(pca73lakes, axes = c(2,3),repel=T,label = c("var"),
 plot(pcafviz)
 plot(pcafviz23)
 
+# -----
 # pca without all outliers  -----
 
 lakes65pca <- lakes65 %>% fill.na() %>% select(c("RR","OD","BdgT","lag_bdg","CN","K","Na","EC_Kje","Mn","Mg","As","c_O2","pH","tmax","DN","NO2","TN","Ca","Alkalinity","TP")) %>% sapply(as.numeric) %>% as.data.frame()
@@ -218,7 +271,7 @@ pcafviz23 <- fviz_pca_biplot(pca65lakes, axes = c(2,3),repel=T,label = c("var"),
                              gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ theme_light(base_size=24) 
 plot(pcafviz)
 plot(pcafviz23)
-
+# -----
 # pca of outliers -----
 lakes8pca <- lakes73num %>% fill.na() %>% filter(RR > 10) %>% select(c("RR","OD","BdgT","SARuv","Zn","tmax","TOC","DOC","CN","CP","V","Cr"))
 
@@ -234,7 +287,7 @@ pcafviz23 <- fviz_pca_biplot(pca8lakes, axes = c(2,3),repel=T,label = "var",col.
 plot(pcafviz23)
 
 dev.off()
-
+# -----
 # clean PCA ----
 
 pdf("8.version_control/pca_plots.pdf",width=10,height = 8)
@@ -254,7 +307,7 @@ pcafviz23 <- fviz_pca_biplot(pca73lakes, axes = c(2,3),repel=T,label = c("var"),
 
 plot(pcafviz)
 plot(pcafviz23)
-
+# -----
 # pca without all outliers  -----
 lakes65 <- filter(lakes73,RR<10)
 lakes65pca <- lakes65 %>% fill.na() %>% select(c("RR","OD","BdgT","CN","EC_Kje","c_O2","p_CO2","pH_Kje","TN","TP")) %>% sapply(as.numeric) %>% as.data.frame()
@@ -273,6 +326,7 @@ pcafviz23 <- fviz_pca_biplot(pca65lakes, axes = c(2,3),repel=T,label = c("var"),
 plot(pcafviz)
 plot(pcafviz23)
 
+# -----
 # pca of outliers -----
 lakes8pca <- lakes73num %>% fill.na() %>% filter(RR > 10) %>% select(c("RR","OD","BdgT","SARuv","Zn","TOC","CN","CP","V","Cr"))
 
@@ -294,10 +348,89 @@ plot(pcafviz23)
 dev.off()
 
 
+# -----
+# pca of DNOM characteristics -----
+dnom_ctq <- c("RR","BdgT","SUVA","SARuv","pH","DOC","TN","TP")
 
+pdf("8.version_control/pca_dnom_characteristics.pdf",width=10,height = 8)
+
+###
+dnom_ctq73 <- lakes73num %>% select(all_of(dnom_ctq))
+pca_dnom_ctq <- prcomp(~.,data=dnom_ctq73,scale.=T,center=T)
+pcafviz <- fviz_pca_biplot(pca_dnom_ctq, repel=T,label = "var",col.ind = "contrib",
+                           select.var = list(contrib = 15), 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "all lakes (73)")
+plot(pcafviz)
+
+pcafviz23 <- fviz_pca_biplot(pca_dnom_ctq, axes = c(2,3),repel=T,label = "var",col.ind = "contrib",
+                             select.var = list(contrib = 15), 
+                             gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "all lakes (73)")
+plot(pcafviz23)
+
+###
+dnom_ctq65 <- lakes65num %>% select(all_of(dnom_ctq))
+pca_dnom_ctq <- prcomp(~.,data=dnom_ctq65,scale.=T,center=T)
+pcafviz <- fviz_pca_biplot(pca_dnom_ctq, repel=T,label = "var",col.ind = "contrib",
+                           select.var = list(contrib = 15), 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "main lakes (65")
+plot(pcafviz)
+
+pcafviz23 <- fviz_pca_biplot(pca_dnom_ctq, axes = c(2,3),repel=T,label = "var",col.ind = "contrib",
+                             select.var = list(contrib = 15), 
+                             gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "main lakes (65)")
+plot(pcafviz23)
+
+###
+dnom_ctq8 <- lakes8num %>% select(all_of(dnom_ctq))
+pca_dnom_ctq <- prcomp(~.,data=dnom_ctq8,scale.=T,center=T)
+pcafviz <- fviz_pca_biplot(pca_dnom_ctq, repel=T,label = "var",col.ind = "contrib",
+                           select.var = list(contrib = 15), 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "outliers (8)")
+plot(pcafviz)
+
+pcafviz23 <- fviz_pca_biplot(pca_dnom_ctq, axes = c(2,3),repel=T,label = "var",col.ind = "contrib",
+                           select.var = list(contrib = 15), 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "outliers (8)")
+plot(pcafviz23)
+
+
+lakes73corpca <- lakes73cor %>% select(c("RR.DOC","SUVA","SARuv","pH","DOC","TN","TP"))
+
+pcalakes73cor <- prcomp(~., data = lakes73corpca,scale.=T,center=T)
+pcafviz <- fviz_pca_biplot(pcalakes73cor, repel=T,label = "var",col.ind = "contrib",
+                           select.var = list(contrib = 15), 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "all lakes")
+plot(pcafviz)
+
+pcafviz <- fviz_pca_biplot(pcalakes73cor,axes = c(2,3), repel=T,label = "var",col.ind = "contrib",
+                           select.var = list(contrib = 15), 
+                           gradient.cols =  viridis(3,end=0.8,direction = -1),arrowsize=1,labelsize=6,title="")+ 
+  theme_light(base_size=24)+
+  labs(title = "all lakes")
+
+plot(pcafviz)
+
+dev.off()
+
+
+# -----
 # corrplot -----
 
-corlakes73 <- cor(lakes73num, use="pairwise.complete.obs",method = c("pearson"))
+corlakes73 <- cor(lakes73num, use="complete.obs",method = c("pearson"))
 write_xlsx(as.data.frame(corlakes73),"8.version_control/corlakes73.xlsx")
 corlakes73_pvalues <- corrplot::cor.mtest(lakes73num,conf.level=0.95)
 corrplot::corrplot(corlakes73,method = c("number"),type=c("upper"),tl.cex = 0.6,number.cex=0.45,p.mat = corlakes73_pvalues$p,insig = "blank")
@@ -310,6 +443,7 @@ lakes73num$trophic <- lakes73$trophic
 lakes8num$trophic <- lakes8$trophic
 lakes65num$trophic <- lakes65$trophic
 
+# -----
 # boxplots lakes 73 ----
 pdf("8.version_control/boxplots_lakes73.pdf")
 
@@ -348,6 +482,7 @@ ggplot(lakes73num,aes(x="DOC/DP",y=DOC/DP))+geom_boxplot(outlier.shape = NA)+
 
 dev.off()
 
+# -----
 # boxplots by trophic state -----
 pdf("8.version_control/boxplot_by_trophic.pdf")
 
@@ -363,7 +498,6 @@ for (i in names(lakes8num)){
 dev.off()
 
 # -----
-
 # other plots -----
 ggplot()+geom_text_repel(data=lakes8,aes(x=OD,y=RR*BdgT,col=trophic,label = Lake_ID),nudge_y = 5,size = 5)+
   geom_point(data=lakes8,aes(x=OD,y=RR*BdgT,col=trophic), size = 3)+
@@ -381,6 +515,49 @@ ggplot()+geom_point(data=lakes65,aes(x=BdgT,y=Cr,col="lakes65"))+geom_point(data
 
 ggplot(lakes65)+geom_text(aes(x=lag_bdg,y=RR,label=Lake_ID,col=trophic))
 
+
+lakes73cor <- lakes73num %>% select(!c("auc","ox_initial","EC_bio","NIVA_date","Long","Altitude","tmax_h","tmax","CNP","Lake_ID","CBA_week","d2H","d18O","Lat","s_275_295","width","DNA","pH_bio","NO2","NO3"))
+lakes73cor$RR.DOC <- lakes73cor$RR/lakes73cor$DOC
+pdf("8.version_control/comp_cor_RR.pdf",width=10,height = 7)
+print.cor.signif2(lakes73cor,"RR",title=F)
+print.cor.signif2(lakes73cor,"RR.DOC",title=F)
+print.cor.signif2(lakes73cor,"BdgT",title = F)
+print.cor.signif2(lakes73cor,"DOC",title=F)
+dev.off()
+
+
+
+
+### maps
+
+ggplot(lakes73)+geom_text(aes(x=incub_date,y=RR,col=incub_date,label=Lake_ID),size=5,show.legend = F)+
+  theme_light(base_size=20)+theme(legend.position = "none",axis.text.x = element_text(angle = 45))+
+  scale_color_brewer(palette="Paired")
+
+ggplot(lakes73)+geom_text(aes(x=incub_date,y=RR,col=DOC,label=Lake_ID),size=5,show.legend = T)+
+  theme_light(base_size=20)+theme(axis.text.x = element_text(angle = 30))+
+  scale_color_viridis_c(direction = -1, end = 0.8)
+
+ggplot() +
+  geom_sf(data=world,fill = "white") +
+  coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=incub_date,size=RR))+
+  geom_point(data=lakes8,aes(x=Long,y=Lat),col="black",size=5,shape="*")+
+  scale_color_brewer(palette="Paired")+
+  theme_void(base_size = 24)+labs(col="Incubation date")
+
+ggplot() +
+  geom_sf(data=world,fill = "white") +
+  coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=incub_date,size=DOC))+
+  geom_point(data=lakes8,aes(x=Long,y=Lat),col="black",size=5,shape="*")+
+  scale_color_brewer(palette="Paired")+
+  theme_void(base_size = 24)+labs(col="Incubation date")
+
+ggplot(lakes73num)+geom_text(aes(x=BdgT,y=RR,label=Lake_ID))+theme_light(base_size=20)
+ggplot(lakes73num)+geom_text(aes(x=SARuv,y=BdgT,label=Lake_ID))+theme_light(base_size=20)
+
+# -----
 # maps -----
 
 pdf("5.100_lakes/RR_maps.pdf",width=10,height=10)
@@ -481,6 +658,7 @@ ggplot()+geom_sf(data=norgemap)+
 
 dev.off()
 
+# -----
 # clusters -----
 
 csel <- c("Lake_ID","DOC","TN","TP","a410")
@@ -495,6 +673,7 @@ hc <- hclust(dd, method = "ward.D2")
 
 dend70c <- as.dendrogram(hc)
 
+# -----
 # optimal number of clusters -----
 lakes73_scaled <- scale(clust70c) %>% as.data.frame()
 lakes73_scaled <- fill.na(lakes73_scaled)
@@ -509,6 +688,7 @@ fviz_nbclust(lakes73_scaled, kmeans, method = "silhouette")
 fviz_nbclust(lakes73_scaled, kmeans, method = "gap_stat")
 
 
+# -----
 # creates clusters ----
 nb_clusters <- 4
 lakes73$cluster <- cutree(dend70c,nb_clusters)
@@ -526,6 +706,7 @@ plot(dendplotc,horiz = T)
 dev.off()
 
 
+# -----
 # graphs and map of clusters -----
 pdf("8.version_control/bdg_by_cluster.pdf",width=10,height=8)
 ggplot(lakes73,aes(y=RR.OD,x=trophic))+geom_boxplot(aes(group=trophic),outlier.shape = NA)+geom_jitter(aes(col=DOC),width=0.3,size=3)+
@@ -546,6 +727,7 @@ ggplot()+geom_sf(data=norgemap)+
 ggsave("8.version_control/map_clusters.png",width=10,height = 10)
 
 
+# -----
 # ANOVA -----
 
 a1 <- aov(RR.OD~as.factor(cluster),data=lakes73)
@@ -612,6 +794,7 @@ ggplot(ptt.graph,aes(y=param))+geom_point(aes(x=ptt12,col="12",shape=pvalue),siz
   scale_y_discrete(limits = (rev(x.graph)))
 ggsave("5. 100 lakes/cluster_difference.png",height = 15,width = 10)
 
+# -----
 # Kruskal Wallis -----
 
 k1 <- kruskal.test(DOC~cluster,data=lakes73)
@@ -659,6 +842,7 @@ pwt$pwt23[which(pwt$pwt23 < 0.05)] <- "Cluster 2 ≠ Cluster 3"
 
 pwt.graph <- pwt %>% filter(!param %in% c("Sample_ID","cluster"))
 
+# -----
 # graph -----
 x <- c("temperature","Al","SUVA","Fe","CH4","Cl","Co","Cu",
        "RR.OD", "CN","CP","pH","SR","BdgT",
@@ -680,6 +864,7 @@ ggplot(pwt.graph,aes(y=param))+geom_point(aes(x=pwt12,col="12",shape=pvalue),siz
   scale_y_discrete(limits = (rev(x.graph)))
 ggsave("5. 100 lakes/cluster_difference.png",height = 15,width = 10)
 
+# -----
 # data presentation ----
 library(grid)
 vp <- viewport(x=0.45,y=0.5,width=0.9,height=0.9)
@@ -740,11 +925,13 @@ summary_lakes73[,1] <- rownames(summary_lakes73)
 write_xlsx(summary_lakes73,"5. 100 lakes/summary_lakes73.xlsx")
 
 
+# -----
 # correLations ----
 pdf("5.100_lakes/all.parameters.correLations.pdf",width=15,height = 8)
 sapply(names(lakes73),print.cor.signif2, df=lakes73)
 dev.off()
 
+# -----
 # print cor all lakes -----
 
 pdf("8.version_control/corplots.pdf",width=10,height = 8)
@@ -760,6 +947,7 @@ print.cor.signif2(select(lakes73num,c("RR","TOC","CN","CP","DOC","tmax","OD")),"
 #print.cor.signif(lakes73num,"BdgT")
 print.cor.signif2(select(lakes73num,c("BdgT","DN","TN","NO2","NO3","K","Ca","pH","Alkalinity","EC_Kje","c_O2","Mg","TP","Cd")),"BdgT",title = "73 lakes")
 
+# -----
 # print cor without outliers -----
 
 lakes65num <- lakes65 %>% sapply(as.numeric) %>% as.data.frame() %>% select_if(not_all_na)
@@ -771,6 +959,7 @@ print.cor.signif2(select(lakes65num,c("OD","RR","BdgT","c_O2","pH","tmax","Co"))
 #print.cor.signif(lakes65num,"BdgT")
 print.cor.signif2(select(lakes65num,c("BdgT","OD","DN","NO2","TN","K","NO3","Ca","c_O2","EC","pH","Mg","Alkalinity","TP","Hg_total","As","CN","Cells")),"BdgT",title = "Without outliers")
 
+# -----
 # print cor outliers -----
 lakes8 <- lakes73 %>% filter(RR > 10)
 lakes8num <- lakes8 %>% sapply(as.numeric) %>% as.data.frame() %>% select_if(not_any_na)
@@ -783,8 +972,50 @@ print.cor.signif2(select(lakes8num,c("OD","tmax","TOC","RR","CP","BdgT","V")),"O
 print.cor.signif2(select(lakes8num,c("BdgT","Cr","TOC","CP","DOC","CN","OD")),"BdgT",title = "Outliers")
 
 dev.off()
+# -----
+# print cor all lakes spearman -----
+
+pdf("8.version_control/corplots_spearman.pdf",width=10,height = 8)
+
+lakes73num$trophic <- NULL
+
+#print.cor.signif2(lakes73num,"RR",meth="spearman")
+print.cor.signif2(select(lakes73num,c("RR","OD","CN","EC","Cl","K","SO4","Hg_total","Mn","NO3","Na","Mg")),"RR",title =  "73 lakes", meth = "spearman")
+
+#print.cor.signif2(lakes73num,"OD",meth = "spearman")
+print.cor.signif2(select(lakes73num,c("RR","BdgT","c_O2","Na","Hg_total","p_N2","OD")),"OD",title = "73 lakes", meth = "spearman")
+
+#print.cor.signif2(lakes73num,"BdgT", meth = "spearman")
+print.cor.signif2(select(lakes73num,c("BdgT","pH","Alkalinity","OD","Ca","O2","SO4","NO2","Fe","CN","CP","SARvis")),"BdgT",title = "73 lakes", meth = "spearman")
+
+# -----
+# print cor without outliers spearman  -----
+
+lakes65num <- lakes65 %>% sapply(as.numeric) %>% as.data.frame() %>% select_if(not_all_na)
+
+#print.cor.signif2(lakes65num,"RR",meth="spearman")
+print.cor.signif2(select(lakes65num,c("RR","OD","CN","K","Na","EC","Mn","Mg","NO3","Hg_total")),"RR",title = "Without outliers", meth = "spearman")
+#print.cor.signif2(lakes65num,"OD",title = "without ouliers",meth = "spearman")
+print.cor.signif2(select(lakes65num,c("OD","RR","BdgT","pH","O2","SARuv","Hg_total")),"OD",title = "Without outliers", meth = "spearman")
+#print.cor.signif2(lakes65num,"BdgT", meth = "spearman")
+print.cor.signif2(select(lakes65num,c("BdgT","pH","OD","Alkalinity","Ca","O2","SO4","NO2","Mg","DP","Cells","Fe","CP","CN","SARvis","EC_bio")),"BdgT",title = "Without outliers", meth = "spearman")
+
+# -----
+# print cor outliers spearman -----
+lakes8 <- lakes73 %>% filter(RR > 10)
+lakes8num <- lakes8 %>% sapply(as.numeric) %>% as.data.frame() %>% select_if(not_any_na)
+
+#print.cor.signif2(lakes8num,"RR", meth = "spearman")
+print.cor.signif2(select(lakes8num,c("RR","SARuv","V","Zn","Co")),"RR",title = "Outliers", meth = "spearman")
+#print.cor.signif2(lakes8num,"OD", meth = "spearman")
+print.cor.signif2(select(lakes8num,c("OD","CP","TOC","BdgT","CP","BdgT","TP")),"OD",title = "Outliers", meth = "spearman")
+#print.cor.signif2(lakes8num,"BdgT",meth = "spearman")
+print.cor.signif2(select(lakes8num,c("BdgT","p_CO2","OD","c_CO2")),"BdgT",title = "Outliers", meth = "spearman")
+
+dev.off()
 
 
+# -----
 # print correlation by trophic state -----
 lakes73num$trophic <- lakes73$trophic
 
@@ -821,7 +1052,6 @@ print.cor.signif2(select(lakes73dys,c("BdgT","Ca","conductivity","Na","SO4","NO2
 dev.off()
 
 # -----
-
 # correLataions - figures ----
 
 pdf("5. 100 lakes/RR_corr.pdf",height = 10,width=15)
@@ -845,6 +1075,7 @@ print.cor.signif2(cor_DOC,"DOC",title = F)
 dev.off()
 
 
+# -----
 # linear regression ----
 
 lm(RR~TN*TP*TOC*Ca*pH,data=lakes73) %>% summary()
@@ -861,6 +1092,7 @@ lm(RR~CN*CP*pH,data=lakes8) %>% summary()
 
 # -----
 # Figures for paper -----
+# -----
 # PCA -----
 pca_params <- c("pH","SR","RR.OD","DN","SUVA","DOC","alkalinity","RR","RR.OD","CN","CP")
 lakes73pca <- lakes73[pca_params]
@@ -920,6 +1152,7 @@ dev.off()
 
 
 
+# -----
 # extra plots ----
 
 
@@ -933,3 +1166,49 @@ ggplot(lakes73,aes(x=DOC,y=RR))+geom_point()+geom_smooth(method = "gam",formula 
 ggplot(lakes73,aes(x=DN,y=RR))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
 ggplot(lakes73,aes(x=CN,y=RR))+geom_point()+geom_smooth(method = "gam",formula = y~s(x))+theme_light(base_size=24)
 
+
+# ---
+# lasso model
+install.packages("glmnet", repos = "http://cran.us.r-project.org")
+library("glmnet")
+install.packages("mice")
+library(mice)
+
+
+
+RRmice <- lakes73num %>% select(!c("RR","SARvis","auc","width","OD","BdgT","RR.DOC","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week")) %>% mice(method = "cart")
+complete(RRmice)
+RR65mice <- lakes65num %>% select(!c("RR","SARvis","auc","width","OD","BdgT","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week")) %>% mice(method="cart")
+
+glm.mids(lakes73$RR~.,data=RRmice) %>% summary()
+
+
+RRmatrix <-lakes73num %>% select(c("Cells","DOC","DN","DP","pH","EC","Cl","NO2","B","SO4","Na","K","Ca","Mg","Fe","Al","SUVA","SARuv","CN","CP","c_O2","c_CO2")) %>% as.matrix()
+
+cv.fitRR.1 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 1L)),y=lakes73num$RR,alpha=0)
+coef(cv.fitRR.1,s="lambda.min")
+cv.fitRR.2 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 2L)),y=lakes73num$RR)
+coef(cv.fitRR.2,s="lambda.min")
+cv.fitRR.3 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 3L)),y=lakes73num$RR)
+coef(cv.fitRR.3,s="lambda.min")
+cv.fitRR.4 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 4L)),y=lakes73num$RR)
+coef(cv.fitRR.4,s="lambda.min")
+cv.fitRR.5 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 5L)),y=lakes73num$RR)
+coef(cv.fitRR.5,s="lambda.min")
+
+
+
+cvfit.RR65.1 <- cv.glmnet(x=as.matrix(complete(RR65mice)),y=lakes65num$RR)
+coef(cvfit.RR65.1,s="lambda.min")
+
+
+lm(RR~TOC+SUVA+CN,data=lakes73num) %>% summary()
+ggplot(lakes73num)+geom_point(aes(x=SUVA,y=RR,color = CN))+theme_light()+scale_color_viridis_c()
+
+cv.fitBdgT <- cv.glmnet(x=RRmatrix,y=lakes73num$BdgT)
+plot(cv.fitBdgT)
+coef(cv.fitBdgT,s="lambda.min")
+lm(BdgT~Cells+TOC+TN+TP+pH+Cl+NO2+SO4+K+SARuv,data=lakes73num) %>% summary()
+
+cv.fitBdgT.1 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 1L)),y=lakes73num$BdgT,alpha=0)
+coef(cv.fitBdgT.1,s="lambda.min")

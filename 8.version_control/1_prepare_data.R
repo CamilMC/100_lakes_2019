@@ -46,6 +46,7 @@ rr100lakes$CNP <-  (rr100lakes$DOC/12.011)/(rr100lakes$DN/14.007)/(rr100lakes$DP
 
 rr100lakes$s_350_400[which(rr100lakes$s_350_400 == 0)] <- NA
 rr100lakes$SR <- rr100lakes$s_275_295/rr100lakes$s_350_400
+rr100lakes$sVISa <- rr100lakes$a400/rr100lakes$DOC
 
 #Altitude Langtjern
 rr100lakes[grep("13763",rr100lakes$Sample_ID),which(names(rr100lakes) == "Altitude")] <- 516

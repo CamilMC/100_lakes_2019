@@ -22,6 +22,7 @@ source("8.version_control/bacteria.R")
 
 library("rnaturalearth")
 library(rgeos)
+
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
 # -----
@@ -29,7 +30,7 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 
 lakes73 <- read.csv("8.version_control/rr100lakes.csv")
 # ----
-# summary stats RR, BdgT and OD
+# summary stats RR, BdgT and OD -----
 
 cor.test(lakes73$RR,lakes73$OD)[c("estimate","p.value")] 
 cor.test(lakes73$BdgT,lakes73$OD)[c("estimate","p.value")] 
@@ -658,6 +659,14 @@ ggplot()+geom_sf(data=norgemap)+
 
 dev.off()
 
+ggplot() +
+  geom_sf(data=world,fill = "white") +
+  coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=Lake_ID),size=3)+
+  geom_text_repel(data=lakes73,aes(x=Long,y=Lat,col=Lake_ID,label=Lake_ID),nudge_y=0.1)+
+  scale_color_viridis_c()+theme_void(base_size = 20)
+ggsave("8.version_control/map_LakeID.jpeg",width=15,height=10)
+
 # -----
 # clusters -----
 
@@ -1052,7 +1061,7 @@ print.cor.signif2(select(lakes73dys,c("BdgT","Ca","conductivity","Na","SO4","NO2
 dev.off()
 
 # -----
-# correLataions - figures ----
+# correlations - figures ----
 
 pdf("5. 100 lakes/RR_corr.pdf",height = 10,width=15)
 cor_param_RR <- c("Sample_ID","OD","RR","CN","CP") 
@@ -1168,47 +1177,80 @@ ggplot(lakes73,aes(x=CN,y=RR))+geom_point()+geom_smooth(method = "gam",formula =
 
 
 # ---
-# lasso model
-install.packages("glmnet", repos = "http://cran.us.r-project.org")
+# lasso model -----
+# install.packages("glmnet", repos = "http://cran.us.r-project.org")
 library("glmnet")
-install.packages("mice")
 library(mice)
+library(tidymodels)
+library(broom.mixed)
 
+# create datasets to fill NA
+param2remove <- c("SARvis","auc","width","OD","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week","tmax","tmax_h","ox_initial","F","pH_bio","EC_bio","DNA","p_N2","p_O2","c_O2","p_CO2","c_CO2","p_CH4","p_N2O","d18O","d2H","Tso","a254","a400","a600","a275","a295","s_275_295","a350","a400","s_350_400","lag_bdg","H","CNP","dist_bact")
+RRmice <- lakes73num %>% select(!which(names(lakes73num)%in% param2remove)) %>% mice(method = "cart")
+RR65mice <- lakes65num %>% select(!which(names(lakes65num) %in% param2remove)) %>% mice(method="cart")
 
+RRmira <- with(RRmice,cv.glmnet,y=RR) 
+RRmipo <- pool(RRmira$analysis)
+RRmipo <- pool.scalar(RRmira)
+summary(RRmipo)
 
-RRmice <- lakes73num %>% select(!c("RR","SARvis","auc","width","OD","BdgT","RR.DOC","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week")) %>% mice(method = "cart")
-complete(RRmice)
-RR65mice <- lakes65num %>% select(!c("RR","SARvis","auc","width","OD","BdgT","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week")) %>% mice(method="cart")
-
-glm.mids(lakes73$RR~.,data=RRmice) %>% summary()
-
-
-RRmatrix <-lakes73num %>% select(c("Cells","DOC","DN","DP","pH","EC","Cl","NO2","B","SO4","Na","K","Ca","Mg","Fe","Al","SUVA","SARuv","CN","CP","c_O2","c_CO2")) %>% as.matrix()
-
-cv.fitRR.1 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 1L)),y=lakes73num$RR,alpha=0)
+# lasso models with cross validation for RR, each mice dataset per mice dataset -----
+cv.fitRR.1 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 1L)),y=lakes73num$RR)
 coef(cv.fitRR.1,s="lambda.min")
+r2 <- cv.fitRR.1$glmnet.fit$dev.ratio[which(cv.fitRR.1$glmnet.fit$lambda == cv.fitRR.1$lambda.min)]
+
 cv.fitRR.2 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 2L)),y=lakes73num$RR)
 coef(cv.fitRR.2,s="lambda.min")
+r2 <- cv.fitRR.2$glmnet.fit$dev.ratio[which(cv.fitRR.2$glmnet.fit$lambda == cv.fitRR.2$lambda.min)]
+
 cv.fitRR.3 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 3L)),y=lakes73num$RR)
 coef(cv.fitRR.3,s="lambda.min")
+r2 <- cv.fitRR.3$glmnet.fit$dev.ratio[which(cv.fitRR.3$glmnet.fit$lambda == cv.fitRR.3$lambda.min)]
+
 cv.fitRR.4 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 4L)),y=lakes73num$RR)
 coef(cv.fitRR.4,s="lambda.min")
+r2 <- cv.fitRR.4$glmnet.fit$dev.ratio[which(cv.fitRR.4$glmnet.fit$lambda == cv.fitRR.4$lambda.min)]
+
 cv.fitRR.5 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 5L)),y=lakes73num$RR)
 coef(cv.fitRR.5,s="lambda.min")
+r2 <- cv.fitRR.5$glmnet.fit$dev.ratio[which(cv.fitRR.5$glmnet.fit$lambda == cv.fitRR.5$lambda.min)]
 
 
 
-cvfit.RR65.1 <- cv.glmnet(x=as.matrix(complete(RR65mice)),y=lakes65num$RR)
-coef(cvfit.RR65.1,s="lambda.min")
-
+cv.fitRR65.1 <- cv.glmnet(x=as.matrix(complete(RR65mice)),y=lakes65num$RR)
+coef(cv.fitRR65.1,s="lambda.min")
+r2 <- cv.fitRR65.1$glmnet.fit$dev.ratio[which(cv.fitRR65.1$glmnet.fit$lambda == cv.fitRR65.1$lambda.min)]
 
 lm(RR~TOC+SUVA+CN,data=lakes73num) %>% summary()
 ggplot(lakes73num)+geom_point(aes(x=SUVA,y=RR,color = CN))+theme_light()+scale_color_viridis_c()
 
+# lasso models with cross validation for BdgT -----
 cv.fitBdgT <- cv.glmnet(x=RRmatrix,y=lakes73num$BdgT)
 plot(cv.fitBdgT)
 coef(cv.fitBdgT,s="lambda.min")
 lm(BdgT~Cells+TOC+TN+TP+pH+Cl+NO2+SO4+K+SARuv,data=lakes73num) %>% summary()
 
-cv.fitBdgT.1 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 1L)),y=lakes73num$BdgT,alpha=0)
+cv.fitBdgT.1 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 1L)),y=lakes73num$BdgT)
 coef(cv.fitBdgT.1,s="lambda.min")
+r2 <- cv.fitBdgT.1$glmnet.fit$dev.ratio[which(cv.fitBdgT.1$glmnet.fit$lambda == cv.fitBdgT.1$lambda.min)]
+
+cv.fitBdgT.2 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 2L)),y=lakes73num$BdgT)
+coef(cv.fitBdgT.2,s="lambda.min")
+r2 <- cv.fitBdgT.2$glmnet.fit$dev.ratio[which(cv.fitBdgT.2$glmnet.fit$lambda == cv.fitBdgT.2$lambda.min)]
+
+cv.fitBdgT.3 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 3L)),y=lakes73num$BdgT)
+coef(cv.fitBdgT.3,s="lambda.min")
+r2 <- cv.fitBdgT.3$glmnet.fit$dev.ratio[which(cv.fitBdgT.3$glmnet.fit$lambda == cv.fitBdgT.3$lambda.min)]
+
+cv.fitBdgT.4 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 4L)),y=lakes73num$BdgT)
+coef(cv.fitBdgT.4,s="lambda.min")
+r2 <- cv.fitBdgT.4$glmnet.fit$dev.ratio[which(cv.fitBdgT.4$glmnet.fit$lambda == cv.fitBdgT.4$lambda.min)]
+
+cv.fitBdgT.5 <- cv.glmnet(x=as.matrix(complete(RRmice,action = 5L)),y=lakes73num$BdgT)
+coef(cv.fitBdgT.5,s="lambda.min")
+r2 <- cv.fitBdgT.5$glmnet.fit$dev.ratio[which(cv.fitBdgT.5$glmnet.fit$lambda == cv.fitBdgT.5$lambda.min)]
+
+
+cv.fitBdgT65.1 <- cv.glmnet(x=as.matrix(complete(RR65mice)),y=lakes65num$BdgT)
+coef(cv.fitBdgT65.1,s="lambda.min")
+r2 <- cv.fitBdgT65.1$glmnet.fit$dev.ratio[which(cv.fitBdgT65.1$glmnet.fit$lambda == cv.fitBdgT65.1$lambda.min)]

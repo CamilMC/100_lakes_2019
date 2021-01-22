@@ -13,7 +13,7 @@ library(factoextra)
 library(viridisLite)
 library(reshape2)
 
-source("5.100_lakes/100lakes_analysis_functions.R")
+source("8.version_control/100lakes_analysis_functions.R")
 norgemap <- st_read("3.Maps/TM_WORLD_BORDERS-0.3.shp")
 source("8.version_control/bacteria.R")
 
@@ -1181,7 +1181,6 @@ ggplot(lakes73,aes(x=CN,y=RR))+geom_point()+geom_smooth(method = "gam",formula =
 # install.packages("glmnet", repos = "http://cran.us.r-project.org")
 library("glmnet")
 library(mice)
-library(tidymodels)
 library(broom.mixed)
 
 # create datasets to fill NA

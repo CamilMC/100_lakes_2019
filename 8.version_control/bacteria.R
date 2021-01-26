@@ -52,9 +52,40 @@ bacteria73_noid$Lake_ID <- NULL
 dist_bacteria <- dist(bacteria73_noid) %>% as.matrix() %>% as.data.frame() %>% select("13763") %>% setNames("dist_bacteria")
 dist_bacteria$Sample_ID <- rownames(dist_bacteria)
 
+# makes clusters out of dist
+hc <- hclust(dist(bacteria73_noid), method = "ward.D2")
+
+# optimal number of clusters -----
+bact73_scaled <- scale(bacteria73_noid) %>% as.data.frame()
+
+# elbow method
+fviz_nbclust(bact73_scaled, kmeans, method = "wss") 
+
+#silhouette method
+fviz_nbclust(bact73_scaled, kmeans, method = "silhouette")
+
+
+fviz_nbclust(bact73_scaled, kmeans, method = "gap_stat")
+
+#plot
+nb_clusters <- 3
+colors_cluster <- viridis(nb_clusters,end = 0.8,direction = -1)
+
+dend_bacteria <- as.dendrogram(hc)
+plot(dend_bacteria)
+dend_bact_polar <- dend_bacteria %>% color_branches(k=nb_clusters,col=colors_cluster) %>% color_labels(k=nb_clusters,col=colors_cluster)
+library(circlize)
+circlize_dendrogram(dend_bact_polar,dend_trackheight = .4)
+
+# -----
+# adds cluster to lakes73 dataframe
+lakes73$bact_cluster <- cutree(dend_bacteria,nb_clusters)
+aov(RR~bact_cluster,data=lakes73) %>% summary()
+aov(BdgT~bact_cluster,data=lakes73) %>% summary()
+
 # adds the distance to lakes70 dataframe
-lakes70_bact <- merge(lakes70,dist_bacteria,by.x="Sample_ID",by.y = "Sample_ID")
-lakes70$dist_bact <- lakes70_bact$dist_bacteria
+#lakes70_bact <- merge(lakes70,dist_bacteria,by.x="Sample_ID",by.y = "Sample_ID")
+#lakes70$dist_bact <- lakes70_bact$dist_bacteria
 
 # test difference of distance between clusters 
 ggplot(lakes70_bact)+geom_boxplot(aes(x=cluster,y=dist_bacteria,group=cluster))

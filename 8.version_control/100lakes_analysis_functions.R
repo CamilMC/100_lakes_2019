@@ -207,6 +207,7 @@ print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1,meth = "pearson"
   # correlation table with p values
   cor.param <-data.frame(predictor = rep(NA,length(names(df2))))
   cor.param$predictor <- names(df2) %>% as.vector()
+
   cor.param$corr <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]],method= meth )$estimate)
   cor.param$pvalue <- sapply(cor.param[,1], function(x) cor.test(df2[[param]],df2[[x]],method = meth )$p.value)
   cor.param <- cor.param[order(cor.param$corr, decreasing = T),]

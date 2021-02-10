@@ -40,7 +40,9 @@ cor.test(lakes73$RR,lakes73$OD)[c("estimate","p.value")]
 cor.test(lakes73$BdgT,lakes73$OD)[c("estimate","p.value")] 
 cor.test(lakes73$RR,lakes73$BdgT)[c("estimate","p.value")] 
 
-
+ggplot(lakes73)+geom_point(aes(x=RR,y=BdgT,col=OD),size = 4,shape = 5)+theme_light(base_size=20)+scale_color_viridis_c(end = 0.8, direction = -1)+
+  labs(x="Respiration rate (umol/h)",y="Biodegradation period (h)", col = "Oxygen\ndemand\n(umol)")
+ggsave("BdgTvsRR.png",width = 10,height = 6)
 # ----
 # separation of eutrophic/oligotrophic/dystrophic lakes ------
 lakes73$DNOM <- NA
@@ -1219,14 +1221,21 @@ pearson_pooled$p_value[y] <- cor_pooled$ubar
 g <- ggplot(data = filter(pearson_pooled,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=F)),y=r,label=param))+
   geom_col(aes(fill=p_value))+ 
   geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
+  theme_bw(base_size=24)+
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
   scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
                        breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
                        guide="legend")+
-  labs(x = "", y= "r2", title = "Pearson correlation coefficient with RR") + ylim(y1,y2)
+  labs(x = "", y= "r", title = "Pearson correlation coefficient with RR") + ylim(-0.5,1)
   print(g)
+ggsave("8.version_control/r_RR.png",width=10,height = 6)
 
+png("C_corplot.png")
+C_df <- select(lakes73,c("RR","TOC","DOC","CN","CP"))
+corrplot::corrplot(corr = cor_mat(C_df), is.corr = FALSE, p.mat = cor_pmat(C_df), method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,hclust="ward",cl.pos = "n")
+dev.off()
+
+cor_pmat(C_df)
 
 # -----
 # cor.test on mice for BdgT -----
@@ -1239,7 +1248,7 @@ p_values <- c()
 for(y in 1:length(predvar)){
   cor_formula <- as.formula(paste("~BdgT+",predvar[y],sep=""))
   for(x in 1:M){
-    df <- filter(RRmice_long,.imp == x)
+    df <- complete(RRmice,x)
     dfcor <- cor.test(formula = cor_formula, data = df)
     estimates[x] <- dfcor$estimate[[1]]
     p_values[x] <- dfcor$p.value[[1]]
@@ -1251,7 +1260,7 @@ for(y in 1:length(predvar)){
   
 }
 
-g <- ggplot(data = filter(pearson_pooled_bdgT,p_value < 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
+g <- ggplot(data = filter(pearson_pooled_bdgT,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
   geom_col(aes(fill=p_value))+ 
   geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
   theme_bw(base_size=28)+
@@ -1259,8 +1268,11 @@ g <- ggplot(data = filter(pearson_pooled_bdgT,p_value < 0.05),aes(x=reorder(para
   scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
                        breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
                        guide="legend")+
-  xlab("")+ ylim(y1,y2)
+  xlab("")+ ylim(-0.5,1)
 print(g)
+
+
+
 # -----
 # cor.test on mice with Spearman -----
 predvar <- names(lakes73clean)[-which(names(lakes73clean)=="RR")]
@@ -1291,7 +1303,7 @@ g <- ggplot(data = filter(pearson_pooled,p_value < 0.05),aes(x=reorder(param,ord
   scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
                        breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
                        guide="legend")+
-  xlab("")+ ylim(y1,y2)
+  xlab("")+ ylim(-1,1)
 print(g)
 
 df2 <- filter(pearson_pooled,p_value < 0.05)
@@ -1309,7 +1321,7 @@ print(g)
 
 
 # -----
-# cor.test on mice for BdgT -----
+# cor.test Spearman on mice for BdgT -----
 
 predvar <- names(lakes73clean)[-which(names(lakes73clean)=="BdgT")]
 
@@ -1319,8 +1331,8 @@ p_values <- c()
 for(y in 1:length(predvar)){
   cor_formula <- as.formula(paste("~BdgT+",predvar[y],sep=""))
   for(x in 1:M){
-    df <- filter(RRmice_long,.imp == x)
-    dfcor <- cor.test(formula = cor_formula, data = df)
+    df <- complete(RRmice, x)
+    dfcor <- cor.test(formula = cor_formula, data = df,method = "spearman")
     estimates[x] <- dfcor$estimate[[1]]
     p_values[x] <- dfcor$p.value[[1]]
   }
@@ -1339,7 +1351,7 @@ g <- ggplot(data = filter(pearson_pooled_bdgT,p_value < 0.05),aes(x=reorder(para
   scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
                        breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
                        guide="legend")+
-  xlab("")+ ylim(y1,y2)
+  xlab("")+ ylim(-1,1)
 print(g)
 
 # -----
@@ -1395,6 +1407,110 @@ for (x in 1:length(lasso_coef_bdgt$param)){
 
 write_xlsx(lasso_coef_bdgt,"8.version_control/lasso_coef_BdgT.xlsx")
 
-
+# with lasso estimates
 ggplot(lakes73clean)+geom_point(aes(x=BdgT,y=2.73+2.82*DN+0.15*pH))
+ggplot(lakes73clean)+geom_point(aes(x=BdgT,y=2.73+2.82*DN+0.15*pH))+geom_abline(slope=1,intercept = 2.73)
+
+
+# Gauss-lasso estimator RR -----
+lm(RR~CN,data=lakes73) %>% summary()
+ggplot(lakes73)+geom_text(aes(x=RR,y=1.09+0.083*CN,label=Lake_ID))+geom_abline(slope=1,intercept=0)
+
+# -----
+# Gauss-lasso estimator BdgT -----
 lm(BdgT~DN+pH,data=lakes73clean) %>% summary()
+ggplot(lakes73)+geom_text(aes(x=BdgT,y=-3.46+5.22*DN+0.83*pH,label=Lake_ID))+geom_abline(slope=1,intercept=0)
+
+lm(BdgT~pH+DN+Cells+Zn+TOC+T,data=lakes73) %>% summary()
+lm(BdgT~pH*DN,lakes73) %>% summary()
+
+cor.test(formula = BdgT ~ 2.73+2.82*DN+0.15*pH, data = lakes73clean)
+
+# cor.test on mice for RR/DOC -----
+
+lakes73clean$RRn <- lakes73clean$RR/lakes73clean$DOC
+predvar <- names(lakes73clean)[-which(names(lakes73clean) %in% c("BdgT","RR","RRn"))]
+
+
+pearson_pooled_RRn <- predvar %>% as.data.frame() %>% setNames("param")
+estimates <- c()
+p_values <- c()
+for(y in 1:length(predvar)){
+  cor_formula <- as.formula(paste("~RRn+",predvar[y],sep=""))
+  for(x in 1:M){
+    df <- complete(RRmice,x)
+    dfcor <- cor.test(formula = cor_formula, data = df)
+    estimates[x] <- dfcor$estimate[[1]]
+    p_values[x] <- dfcor$p.value[[1]]
+  }
+  
+  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
+  pearson_pooled_RRn$r[y] <- cor_pooled$qbar
+  pearson_pooled_RRn$p_value[y] <- cor_pooled$ubar
+  
+}
+
+g <- ggplot(data = filter(pearson_pooled_RRn,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
+  geom_col(aes(fill=p_value))+ 
+  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
+  theme_bw(base_size=28)+
+  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
+  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
+                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
+                       guide="legend")+
+  xlab("")+ ylim(-0.5,1)
+print(g)
+
+
+spearman_pooled_RRn <- predvar %>% as.data.frame() %>% setNames("param")
+estimates <- c()
+p_values <- c()
+for(y in 1:length(predvar)){
+  cor_formula <- as.formula(paste("~RRn+",predvar[y],sep=""))
+  for(x in 1:M){
+    df <- complete(RRmice,x)
+    dfcor <- cor.test(formula = cor_formula, data = df, method = "spearman", exact = FALSE)
+    estimates[x] <- dfcor$estimate[[1]]
+    p_values[x] <- dfcor$p.value[[1]]
+  }
+  
+  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
+  spearman_pooled_RRn$r[y] <- cor_pooled$qbar
+  spearman_pooled_RRn$p_value[y] <- cor_pooled$ubar
+  
+}
+
+g <- ggplot(data = filter(spearman_pooled_RRn,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
+  geom_col(aes(fill=p_value))+ 
+  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
+  theme_bw(base_size=28)+
+  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
+  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
+                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
+                       guide="legend")+
+  xlab("")+ ylim(-1,1)
+print(g)
+
+lasso_coef_RRn <- c("Intercept",names(dplyr::select(lakes73clean,!c("RRn")))) %>% as.data.frame() %>% setNames("param")
+
+for(z in 1:M){
+  lasso_coef_RRn %>% tibble::add_column(z = NA)
+  data <- complete(RRmice,z)
+  set.seed(1)
+  fit <- cv.glmnet(formula = RRn~., data = data)
+  coef_fit <- fit %>% coef(s="lambda.min") %>% summary()
+  dev_fit <- fit$glmnet.fit %>% deviance()
+  for (w in 1:dim(coef_fit)[1]){
+    lasso_coef_RRn[coef_fit[w,1],z+1] <- coef_fit[w,3]
+  }
+}
+
+lasso_coef_RRn$pooled <- NA
+for (x in 1:length(lasso_coef_RRn$param)){
+  estimates <- lasso_coef_RRn[x,] %>% dplyr::select(c(2:M+1)) %>% as.numeric()
+  lasso_coef_RRn$pooled[x] <- pool.scalar(estimates,c(rep(1,10)),n=73,k=1)$qbar
+}
+
+write_xlsx(lasso_coef_RRn,"8.version_control/lasso_coef_RRn.xlsx")
+
+lm(RRn~RR+DOC+SR,data=lakes73clean) %>% summary()

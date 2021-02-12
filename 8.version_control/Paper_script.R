@@ -43,6 +43,50 @@ cor.test(lakes73$RR,lakes73$BdgT)[c("estimate","p.value")]
 ggplot(lakes73)+geom_point(aes(x=RR,y=BdgT,col=OD),size = 4,shape = 5)+theme_light(base_size=20)+scale_color_viridis_c(end = 0.8, direction = -1)+
   labs(x="Respiration rate (umol/h)",y="Biodegradation period (h)", col = "Oxygen\ndemand\n(umol)")
 ggsave("BdgTvsRR.png",width = 10,height = 6)
+
+boxplot(lakes73$RR)
+boxplot(lakes73$BdgT)
+
+g <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=RR))
+outliers <- ggplot_build(g)[["data"]][[1]][["outliers"]] %>% as.data.frame()
+outliers_ID <-  filter(lakes73, lakes73$RR %in% outliers[[1]]) %>% dplyr::select(Lake_name)
+outliers$Lake_ID <- outliers_ID$Lake_name
+names(outliers) <- c("RR","Lake_name")
+g <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=RR),outlier.size = 3, width = 1.5)+theme_light(base_size = 20)+xlab("")+ylab("RR (umol/h)")+
+  geom_text_repel(data=outliers,aes(x="",y=outliers[,"RR"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
+print(g)
+ggsave("boxplot_RR.png",width=4,height=6)
+
+h <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=BdgT))
+outliers <- ggplot_build(h)[["data"]][[1]][["outliers"]] %>% as.data.frame()
+outliers_ID <-  filter(lakes73, lakes73$BdgT %in% outliers[[1]]) %>% dplyr::select(Lake_name)
+outliers$Lake_ID <- outliers_ID$Lake_name
+names(outliers) <- c("BdgT","Lake_name")
+h <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=BdgT),outlier.size = 3,width=1.5)+theme_light(base_size = 20)+xlab("")+ylab("BdgT (h)")+
+  geom_text_repel(data=outliers,aes(x="",y=outliers[,"BdgT"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
+print(h)
+ggsave("boxplot_BdgT.png",width=4,height=6)
+       
+boxplots <- function(df,coef_out){
+  for(i in names(df)[-1]){
+    g <- ggplot()+geom_boxplot(data=df,aes(x=i,y=df[,i]),coef=coef_out)
+    outliers <- ggplot_build(g)[["data"]][[1]][["outliers"]] %>% as.data.frame()
+    outliers_ID <-  filter(df, df[,i] %in% outliers[[1]]) %>% dplyr::select(Sample_ID)
+    outliers$Sample_ID <- outliers_ID$Sample_ID
+    names(outliers) <- c(i,"Sample_ID")
+    if(length(outliers$Sample_ID) == 0){
+      g <- ggplot()+geom_boxplot(data=df,aes(x=i,y=df[,i]),outlier.size = 4,coef = coef_out)+theme_light(base_size = 20)+xlab("")+ylab(i)
+      print(g)
+    } else {
+      g <- ggplot()+geom_boxplot(data=df,aes(x=i,y=df[,i]),outlier.size = 4,coef = coef_out)+theme_light(base_size = 20)+xlab("")+ylab(i)+
+        geom_text_repel(data=outliers,aes(x=i,y=outliers[,i],label=Sample_ID),position = position_dodge(width=1),size = 6, col = "red",segment.size = 1)
+      print(g)
+    }
+    out[[i]] <- outliers
+  }
+}
+
+
 # ----
 # separation of eutrophic/oligotrophic/dystrophic lakes ------
 lakes73$DNOM <- NA
@@ -1514,3 +1558,4 @@ for (x in 1:length(lasso_coef_RRn$param)){
 write_xlsx(lasso_coef_RRn,"8.version_control/lasso_coef_RRn.xlsx")
 
 lm(RRn~RR+DOC+SR,data=lakes73clean) %>% summary()
+

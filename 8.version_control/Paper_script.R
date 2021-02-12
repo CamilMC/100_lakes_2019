@@ -579,7 +579,7 @@ dev.off()
 
 
 
-### maps
+### maps ------
 
 ggplot(lakes73)+geom_text(aes(x=incub_date,y=RR,col=incub_date,label=Lake_ID),size=5,show.legend = F)+
   theme_light(base_size=20)+theme(legend.position = "none",axis.text.x = element_text(angle = 45))+
@@ -1494,17 +1494,17 @@ for(y in 1:length(predvar)){
   
 }
 
-g <- ggplot(data = filter(pearson_pooled_RRn,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
+g <- ggplot(data = filter(pearson_pooled_RRn,p_value <= 0.04),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
   geom_col(aes(fill=p_value))+ 
   geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
   theme_bw(base_size=28)+
   theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
   scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
+                       breaks = c(0,0.02,0.04, 0.06),labels = c("0","0.02","0.04","0.06"),limits = c(0,0.06), 
                        guide="legend")+
   xlab("")+ ylim(-0.5,1)
 print(g)
-
+ggsave("8.version_control/pearson_RRn.png", width=8,height = 5)
 
 spearman_pooled_RRn <- predvar %>% as.data.frame() %>% setNames("param")
 estimates <- c()
@@ -1534,6 +1534,7 @@ g <- ggplot(data = filter(spearman_pooled_RRn,p_value <= 0.05),aes(x=reorder(par
                        guide="legend")+
   xlab("")+ ylim(-1,1)
 print(g)
+ggsave("8.version_control/spearman_RRn.png",width=8,height = 5)
 
 lasso_coef_RRn <- c("Intercept",names(dplyr::select(lakes73clean,!c("RRn")))) %>% as.data.frame() %>% setNames("param")
 

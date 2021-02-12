@@ -26,7 +26,7 @@ bacteria_lakes$DNAsampleID <- NA
 bacteria_lakes$DNAsampleID <- rownames(seq_asv_t2)
 
 #matches with Lake_ID
-key <- read_xlsx("5.100_lakes/bacteria_100Lakes.xlsx",sheet="key") %>% select(c("Lake_ID","DNAsampleID"))
+key <- read_xlsx("5.100_lakes/bacteria_100Lakes.xlsx",sheet="key") %>% select(c("Lake_ID","Lake_name","DNAsampleID"))
 bacteria_lakes_filtered <- dplyr::filter(bacteria_lakes,DNAsampleID != setdiff(bacteria_lakes$DNAsampleID,key$DNAsampleID))
 bacteria_73lakes <- merge(key,bacteria_lakes_filtered,by.x="DNAsampleID",by.y="DNAsampleID")
 bacteria_73lakes$DNAsampleID <- NULL
@@ -76,6 +76,27 @@ plot(dend_bacteria)
 dend_bact_polar <- dend_bacteria %>% color_branches(k=nb_clusters,col=colors_cluster) %>% color_labels(k=nb_clusters,col=colors_cluster)
 library(circlize)
 circlize_dendrogram(dend_bact_polar,dend_trackheight = .4)
+
+# circle cluster with lake name -----
+bacteria73_name <- bacteria_73lakes
+rownames(bacteria73_name) <- bacteria_73lakes$Lake_name
+bacteria73_name$Lake_ID <- NULL
+bacteria73_name$Lake_name <- NULL
+dist_bacteria_name <- dist(bacteria73_name) %>% as.matrix() %>% as.data.frame() %>% select("Langtjern") %>% setNames("dist_bacteria")
+dist_bacteria_name$Lake_name <- rownames(dist_bacteria_name)
+hc <- hclust(dist(bacteria73_name), method = "ward.D2")
+
+nb_clusters <- 3
+colors_cluster <- viridis(nb_clusters,end = 0.8,direction = -1)
+
+dend_bacteria_name <- as.dendrogram(hc)
+plot(dend_bacteria_name)
+dend_bact_polar <- dend_bacteria_name %>% color_branches(k=nb_clusters,col=colors_cluster) %>% color_labels(k=nb_clusters,col=colors_cluster)
+library(circlize)
+png("8.version_control/dendrogram_bact.png",width=600,height = 600)
+circlize_dendrogram(dend_bact_polar,dend_trackheight = .8,labels_track_height = 0.3)
+dev.off()
+
 
 # -----
 # adds cluster to lakes73 dataframe

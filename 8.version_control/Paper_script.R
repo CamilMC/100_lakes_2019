@@ -282,7 +282,13 @@ ggplot() +
   scale_color_viridis_c()+theme_void(base_size = 20)
 ggsave("8.version_control/map_LakeID.jpeg",width=15,height=10)
 
-
+ggplot() +
+  geom_sf(data=world,fill = "white") +
+  coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=DOC,size=DOC))+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9))+scale_size(range = c(2.5,8))+
+  guides(color = guide_legend(),size=guide_legend())+theme_void(base_size = 24)
+ggsave("8.version_control/map_DOC.jpeg",width=15,height=10)
 
 
 # -----
@@ -295,11 +301,67 @@ dev.off()
 # create multiple imputation datasets to fill NA -----
 param2remove <- c("auc","width","OD","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week","tmax","tmax_h","ox_initial","F","pH_bio","EC_bio","NO2","NO3","DNA","p_N2","p_O2","c_O2","p_CO2","c_CO2","p_CH4","p_N2O","d18O","d2H","Tso","a254","a400","a410","a600","a275","a295","s_275_295","a350","a400","s_350_400","lag_bdg","H","NP","CNP","dist_bact","PO4")
 lakes73clean <- lakes73num %>% dplyr::select(!which(names(lakes73num)%in% param2remove))
+lakes73clean$RRn <- lakes73clean$RR/lakes73clean$DOC
 write_xlsx(lakes73clean,"8.version_control/lakes73clean.xlsx")
 
 M <- 10
 set.seed(5)
 RRmice <- lakes73clean %>% mice(method = "cart",m = M)
+# -----
+# lasso function for mice objects -----
+milasso <- function(mice.object,M,resp.var,excluded.var = "none"){
+  
+  n <- dim(mice.object$data)[1] 
+  lasso_coef <- c("Intercept",names(dplyr::select(mice.object$data,!c(resp.var,excluded.var)))) %>% as.data.frame() %>% setNames("param")
+  lasso_pred <- c(rep(NA,n)) %>% as.data.frame()
+  
+  
+  for (z in 1:M){
+    lasso_coef %>% tibble::add_column(z=NA)
+    data <- complete(mice.object,z) %>% dplyr::select(!excluded.var)
+    set.seed(5)
+    lasso.formula <- as.formula(paste(resp.var,"~.",sep=""))
+    fit <- cv.glmnet(formula = lasso.formula,data = data)
+    coef_fit <- fit %>% coef(s="lambda.min") %>% summary()
+    
+    for (w in 1:dim(coef_fit)[1]){
+      lasso_coef[coef_fit[w,1],z+1] <- coef_fit[w,3]
+    }
+    
+    newmat <- complete(mice.object,z) %>% dplyr::select(!c(resp.var,excluded.var)) 
+    lasso_pred[,z] <- predict(fit,newmat[1:n,],s="lambda.min")
+  }
+  
+  lasso_coef$pooled <- NA
+  lasso_coef$number <- NA
+  lasso_pred$pooled <- rowMeans(lasso_pred)
+  
+  
+  for(x in 1:length(lasso_coef$param)){
+    estimates <- lasso_coef[x,] %>% dplyr::select(c(1:M+1)) %>% as.numeric()
+    lasso_coef$pooled[x] <- pool.scalar(estimates,c(rep(1,M)),n=n,k=1)$qbar 
+    lasso_coef$number[x] <- M - sum(is.na(estimates))
+  }
+
+  final <- list(lasso_coef,lasso_pred)
+  names(final) <- c("lasso_coef","lasso_pred")
+  return(final)
+  
+}
+
+# lasso calculations -----
+lasso_RR <- milasso(RRmice,M,"RR","RRn")
+lasso_BdgT <- milasso(RRmice,M,"BdgT","RRn")
+lasso_RRn <- milasso(RRmice,M,"RRn",c("RR","DOC"))
+
+rmse(lakes73$RR,lasso_RR$lasso_pred$pooled)
+rmse(lakes73$BdgT,lasso_BdgT$lasso_pred$pooled)
+rmse(lakes73clean$RRn,lasso_RRn$lasso_pred$pooled)
+
+write_xlsx(lasso_RR$lasso_coef,"8.version_control/lasso_coef_RR.xlsx")
+write_xlsx(lasso_BdgT$lasso_coef,"8.version_control/lasso_coef_BdgT.xlsx")
+write_xlsx(lasso_RRn$lasso_coef,"8.version_control/lasso_coef_RRn.xlsx")
+
 # -----
 # cor.test on mice RR -----
 predvar <- names(lakes73clean)[-which(names(lakes73clean) %in% c("RR","RRn","BdgTn"))]
@@ -334,7 +396,7 @@ g <- ggplot(data = filter(pearson_pooled,p_value <= 0.05),aes(x=reorder(param,or
   print(g)
 ggsave("8.version_control/r_RR.png",width=10,height = 6)
 
-# correlation plot for parameters with C ----
+# correlation plot for RR ----
 png("C_corplot.png")
 C_df <- select(lakes73,c("RR","TOC","DOC","CN","CP"))
 corrplot::corrplot(corr = cor(C_df), is.corr = FALSE, p.mat = as.matrix(cor_pmat(C_df)[2:length(cor_pmat(C_df))]), method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,hclust="ward",cl.pos = "n")
@@ -344,7 +406,7 @@ png("RR_s_corplot.png",width = 600, height = 600)
 covar_RR <- filter(spearman_pooled,p_value <= 0.05)%>% filter(abs(r) > 0.3) %>% pull("param")
 RR_scor <- micombine.cor(RRmice,variables = c("RR",covar_RR), method="spearman") 
 corrplot::corrplot(corr = attr(RR_scor,"r_matrix"), p.mat = attr(RR_scor,"p_matrix"),sig.level = 0.005, order="AOE",
-                   method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
+                   method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,cl.pos = "n")
 dev.off()
 
 # -----
@@ -469,62 +531,8 @@ png("BdgT_s_corplot.png",width = 600, height = 600)
 covars_BdgT <- filter(spearman_pooled_bdgT,p_value <= 0.05) %>% filter(abs(r) > 0.3)  %>% pull("param")
 BdgT_scor <- micombine.cor(RRmice,variables = c("BdgT",covars_BdgT), method="spearman") 
 corrplot::corrplot(corr = attr(BdgT_scor,"r_matrix"), p.mat = attr(BdgT_scor,"p_matrix"),sig.level = 0.005, order="AOE",
-                   method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
+                   method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,cl.pos = "n")
 dev.off()
-# -----
-# lasso function for mice objects -----
-milasso <- function(mice.object,M,resp.var,excluded.var = "none"){
-  
-  n <- dim(mice.object$data)[1] 
-  lasso_coef <- c("Intercept",names(select(mice.object$data,!c(resp.var,excluded.var)))) %>% as.data.frame() %>% setNames("param")
-  lasso_pred <- c(rep(NA,n)) %>% as.data.frame()
-  
-  
-  for (z in 1:M){
-    lasso_coef %>% tibble::add_column(z=NA)
-    data <- complete(mice.object,z) %>% select(!excluded.var)
-    set.seed(5)
-    lasso.formula <- as.formula(paste(resp.var,"~.",sep=""))
-    fit <- cv.glmnet(formula = lasso.formula,data = data)
-    coef_fit <- fit %>% coef(s="lambda.min") %>% summary()
-    
-    for (w in 1:dim(coef_fit)[1]){
-      lasso_coef[coef_fit[w,1],z+1] <- coef_fit[w,3]
-    }
-    
-    newmat <- complete(mice.object,z) %>% select(!c(resp.var,excluded.var)) 
-    lasso_pred[,z] <- predict(fit,newmat[1:n,],s="lambda.min")
-  }
-  
-  lasso_coef$pooled <- NA
-  lasso_coef$number <- NA
-  lasso_pred$pooled <- rowMeans(lasso_pred)
-  
-  
-  for(x in 1:length(lasso_coef$param)){
-    estimates <- lasso_coef[x,] %>% dplyr::select(c(1:M+1)) %>% as.numeric()
-    lasso_coef$pooled[x] <- pool.scalar(estimates,c(rep(1,M)),n=n,k=1)$qbar 
-    lasso_coef$number[x] <- M - sum(is.na(estimates))
-  }
-
-  final <- list(lasso_coef,lasso_pred)
-  names(final) <- c("lasso_coef","lasso_pred")
-  return(final)
-  
-}
-
-# lasso calculations -----
-lasso_RR <- milasso(RRmice,M,"RR","RRn")
-lasso_BdgT <- milasso(RRmice,M,"BdgT","RRn")
-lasso_RRn <- milasso(RRmice,M,"RRn",c("RR","DOC"))
-
-rmse(lakes73$RR,lasso_RR$lasso_pred$pooled)
-rmse(lakes73$BdgT,lasso_BdgT$lasso_pred$pooled)
-rmse(lakes73clean$RRn,lasso_RRn$lasso_pred$pooled)
-
-write_xlsx(lasso_RR$lasso_coef,"8.version_control/lasso_coef_RR.xlsx")
-write_xlsx(lasso_BdgT$lasso_coef,"8.version_control/lasso_coef_BdgT.xlsx")
-write_xlsx(lasso_RRn$lasso_coef,"8.version_control/lasso_coef_RRn.xlsx")
 
 # -----
 # lasso on log -----
@@ -556,6 +564,8 @@ lm(data=lakes73log,BdgT~Cells+TOC+DN+pH+Alkalinity+Ca+Fe+Cd+Mn+SARuv+SARvis+O2) 
 lm(RR~CN,data=lakes73) %>% summary()
 ggplot(lakes73)+geom_text(aes(x=RR,y=1.09+0.083*CN,label=Lake_ID))+geom_abline(slope=1,intercept=0)
 
+rmse(lakes73$RR,1.09+0.083*lakes73$CN)
+
 # -----
 # Gauss-lasso estimator BdgT -----
 lm(BdgT~DN+pH,data=lakes73clean) %>% summary()
@@ -564,11 +574,11 @@ ggplot(lakes73)+geom_text(aes(x=BdgT,y=-3.46+5.22*DN+0.83*pH,label=Lake_ID))+geo
 lm(BdgT~pH+DN+Cells,data=lakes73) %>% summary()
 lm(BdgT~DN,lakes73) %>% summary()
 
-cor.test(formula = BdgT ~ 2.73+2.82*DN+0.15*pH, data = lakes73clean)
+rmse(lakes73$BdgT,-0.85+5.64*lakes73$DN+0.6*lakes73$pH-2.01*10^(-6)*lakes73$Cells)
 
 # cor.test on mice for RR/DOC -----
 
-lakes73clean$RRn <- lakes73clean$RR/lakes73clean$DOC
+
 predvar <- names(lakes73clean)[-which(names(lakes73clean) %in% c("BdgT","RR","RRn"))]
 
 
@@ -654,5 +664,27 @@ dev.off()
 # Gauss - lasso estimates RRn-----
 lm(RRn~DN+SUVA+SR+V,data=lakes73clean) %>% summary()
 lm(RRn~DN+SR,data=lakes73clean) %>% summary()
+rmse_RRn <- c()
+for(x in 1:M){
+  data <- complete(RRmice,x)
+  actual <- data$RRn
+  predicted <- 0.91-0.74*data$DN-6.23*data$SUVA+0.36*data$SR-5.84*data$V
+  rmse_RRn[x] <- rmse(actual,predicted)
+}
+mean(rmse_RRn)
 
+lm(BdgT~pH,lakes73clean) %>% summary()
 # -----
+alk_imp <- c()
+SAR_imp <- c()
+SR1_imp <- c()
+SR2_imp <- c()
+for(x in 1:M){
+  df <- complete(RRmice,x)
+  dfID <- cbind(lakes73$Lake_ID,df)
+  alk_imp[x] <- filter(dfID,lakes73$Lake_ID == "13459") %>% pull("Alkalinity")
+  SAR_imp[x] <- filter(dfID,lakes73$Lake_ID == "12249") %>% pull("SARvis")
+  SR1_imp[x] <- filter(dfID,lakes73$Lake_ID == "12251") %>% pull("SR")
+  SR2_imp[x] <- filter(dfID,lakes73$Lake_ID == "12757") %>% pull("SR")
+}
+

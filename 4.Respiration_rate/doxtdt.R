@@ -32,7 +32,7 @@ for (i in 1:length(datalist)) {
   for (j in 1:length(vials)){
     
     name_sample <- vials[j]  #ID of the sample
-    doxdt <- -dXdt[,j] #column of the model corresponding to the vial (change sign to get the speed of oxygen consumption)
+    doxdt <- -dXdt[,j]/(60/3600) #column of the model corresponding to the vial (change sign to get the speed of oxygen consumption)
     l <- length(doxdt)
     se.doxdt <- se.dXdt[,j] #corresponding se
     dmax <- max(doxdt) #maximum speed
@@ -49,7 +49,7 @@ for (i in 1:length(datalist)) {
     if(is.na(x2)){x2 <- xmax} #if x2 is na, the value of xmax is attributed to x2
     t2 <- t[x2] #time in hour corresponding to the abciss
     
-    A <- AUC(t,doxdt,from = t1, to = t2 ,method = "spline") #area under the peak from half-height
+    A <- AUC(t[-1],doxdt,from = t1, to = t2 ,method = "step") #area under the peak from half-height
     
     if (doxdt[x1] > dmax/2){
       tstart <- t[xmax]
@@ -65,18 +65,14 @@ for (i in 1:length(datalist)) {
       tstop <- t[xmax]
     }
     
-    hA <- AUC(t,doxdt,from = tstart, to = tstop, method = "spline")
+    hA <- AUC(t[-1],doxdt,from = tstart, to = tstop, method = "step")
     
     #plots
     par(mfrow=c(2,1),mar= c(4,4,1,3))
     matplot(x=t, y=X[,j], type="p", pch=".", col="black", xlab="time (h)", ylab="O2 (?M)")
     matplot(x=t, y=Xs[,j], type="l", lty=1, xlab = "", ylab = "", col="red", add=TRUE)
     mtext(paste("R2 =",format(summary(m[[j]])$r.sq,digits=4)), side = 4, line = 1)
-    matplot(t, doxdt, type="l", lty=1, col="black", xlab=name_sample, ylab="dO2/dt (?M/h)",ylim=c(min(doxdt-se.doxdt),max(doxdt+se.doxdt)))
-    polygon(c(t,rev(t)),c(doxdt-se.doxdt,rev(doxdt+se.doxdt)),border = "grey", col=blues9[3])
-    matplot(t,doxdt,type="l",add=TRUE)
-    # matplot(t, doxdt+se.doxdt, type="l", lty=1, col="grey", xlab="", ylab="",add=TRUE)
-    # matplot(t, doxdt-se.doxdt, type="l", lty=1, col="grey", xlab="", ylab="",add=TRUE)
+    matplot(t[-1], doxdt, type="l", lty=1, col="black", xlab=name_sample, ylab="dO2/dt (?M/h)",ylim=c(min(doxdt-se.doxdt),max(doxdt+se.doxdt)))
     points(t1,doxdt[x1],col="black")
     points(t2,doxdt[x2],col="red")
     abline(v=tstart,col="green")
@@ -85,7 +81,7 @@ for (i in 1:length(datalist)) {
     
     
     #fills dataframe with parameters
-    RRi$sample[j] <- name_sample
+    RRi$sample[j] <- paste(names(datalist)[i],name_sample,sep="_")
     RRi$fit_r2[j] <- summary(m[[j]])$r.sq
     RRi$ox_initial[j] <- Xs[j][1]
     RRi$t_initial[j] <- t[1]

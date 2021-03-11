@@ -1,4 +1,7 @@
-# spectral slopes -----
+#-------------------------
+# getslope
+# Calculate spectral slopes 
+#-------------------------
 
 getslope <- function(df,lambda1,lambda2){
   a1 <- df %>% filter(WL.nm == lambda1)
@@ -10,8 +13,10 @@ getslope <- function(df,lambda1,lambda2){
   return(a)
 }
 
-# histograms -----
+#---------------------------------------------------------
+# hist.df
 # returns histograms of each of the columns of a dataframe
+#---------------------------------------------------------
 
 hist.df <- function(df){
   for (i in names(df)){
@@ -20,8 +25,10 @@ hist.df <- function(df){
   }
 }
 
-# boxplots -----
+#-------------------------------------------------------------------------------------------------------------
+# boxplots
 # returns boxplot of each of the columns of a dataframe + a list of the outliers in a list object called "out"
+#-------------------------------------------------------------------------------------------------------------
 
 boxplots <- function(df,coef_out){
   library("ggrepel")
@@ -70,9 +77,10 @@ boxplots <- function(df,coef_out){
   
 }
 
-# plot.cor -----
-# plots correlations for a specific parameter in a dataframe
-# returns a plot
+#---------------------------------------------------------------------------
+# plot.cor
+# plots correlations for a specific parameter in a dataframe (returns a plot)
+#---------------------------------------------------------------------------
 
 plot.cor <- function(df,param,lim=c(-1,1)){
   df2 <- df
@@ -93,10 +101,12 @@ plot.cor <- function(df,param,lim=c(-1,1)){
   ggsave(plot = g, filename = paste("cor",name_df,param,"png",sep="."),device ="png",width=15,height=10)
 }
 
-# table.cor -----
+#--------------------------------------------------------------------------------------------
+# table.cor 
 # writes a table with the correlations between one specific parameter in one dataframe
 # returns a table called "cor.param" 
 # returns a csv file in the "5. 100 lakes" folder with the name of the df and of the parameter
+#---------------------------------------------------------------------------------------------
 
 table.cor <- function (df,param){
   #save name of the dataframe as a character
@@ -113,13 +123,14 @@ table.cor <- function (df,param){
 }
 
 
-# print.cor -----
+#-------------------------------------------------------------------------
+# print.cor
 # prints both the correlations between one parameter and the rest of the df
 # returns plots
 # adds an element to the list "all.correlations"
+#-------------------------------------------------------------------------
 
 print.cor <- function(df,param,title = T,cor_list = T){
-  
   
   #save name of the dataframe as a character
   df2 <- df
@@ -156,9 +167,11 @@ print.cor <- function(df,param,title = T,cor_list = T){
   } 
 }
 
-# print.cor.signif -----
+#---------------------------------------------------------------
+# print.cor.signif
 # only prints the significant correlations on the graph
 # returns graphs but does not change the list "all.correlations"
+#---------------------------------------------------------------
 
 print.cor.signif <- function(df,param,title = T, meth = "pearson"){
   
@@ -194,9 +207,11 @@ print.cor.signif <- function(df,param,title = T, meth = "pearson"){
   
 }
 
-# print.cor.signif2 -----
+#----------------------------------------------------------------
+# print.cor.signif2
 # only prints the significant correlations on the graph
 # returns graphs but does not change the list "all.correlations"
+#----------------------------------------------------------------
 
 print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1,meth = "pearson"){
   
@@ -234,8 +249,10 @@ print.cor.signif2 <- function(df,param,title = T,y1=-1.1,y2=1.1,meth = "pearson"
   
 }
 
-# plot.radar ----
-# plot radar of the outliers for one parameter -----
+#------------------------------------------------
+# plot.radar
+# plot radar of the outliers for one parameter
+#------------------------------------------------
 
 plot.radar <- function(outlier_df,param){
   
@@ -254,7 +271,9 @@ plot.radar <- function(outlier_df,param){
 
 }
 
-# plot.radar2 : radarplot with title -----
+#-------------------------------------
+# plot.radar2 : radarplot with title 
+#-------------------------------------
 
 plot.radar2 <- function(outlier_df,param){
   outlier_df2 <- outlier_df[,-1]
@@ -271,9 +290,10 @@ plot.radar2 <- function(outlier_df,param){
   #dev.off()
 }
 
+#---------------------------
+# myplot: plots comparisons 
+#---------------------------
 
-# myplot -----
-# plots comparisons -----
 myplot <- function (xvar,yvar,data,lab.x = xvar,lab.y = yvar){
   
   lmxy <- lm(data[,yvar]~data[,xvar]) %>% summary()
@@ -286,8 +306,10 @@ myplot <- function (xvar,yvar,data,lab.x = xvar,lab.y = yvar){
 
   }
 
-# fill.na ----
+#-----------------------------------------------
+# fill.na
 # replaces NA by the mean value of all columns
+#-----------------------------------------------
 
 fill.na <- function(df){
   for (i in names(df)){
@@ -297,8 +319,10 @@ fill.na <- function(df){
   return(df)
 }
 
- 
-# not_all_na and not_any_na -----
+
+#------------------------------- 
+# not_all_na and not_any_na
+#-------------------------------
  not_all_na <- function(x) {any(!is.na(x))}
  not_any_na <- function(x) {all(!is.na(x))}
  

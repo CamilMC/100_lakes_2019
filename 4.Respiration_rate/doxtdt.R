@@ -5,7 +5,7 @@ library("DescTools")
 # loop
 
 RR <- NULL
-pdf("doxdt.pdf")
+pdf("4.Respiration_rate/doxdt.pdf")
 
 for (i in 1:length(datalist)) {
   
@@ -31,7 +31,7 @@ for (i in 1:length(datalist)) {
   
   for (j in 1:length(vials)){
     
-    name_sample <- vials[j]  #ID of the sample
+    name_sample <- paste(names(datalist)[i],vials[j],sep="_")  #ID of the sample
     doxdt <- -dXdt[,j]/(60/3600) #column of the model corresponding to the vial (change sign to get the speed of oxygen consumption)
     l <- length(doxdt)
     se.doxdt <- se.dXdt[,j] #corresponding se
@@ -69,10 +69,10 @@ for (i in 1:length(datalist)) {
     
     #plots
     par(mfrow=c(2,1),mar= c(4,4,1,3))
-    matplot(x=t, y=X[,j], type="p", pch=".", col="black", xlab="time (h)", ylab="O2 (?M)")
+    matplot(x=t, y=X[,j], type="p", pch=".", col="black", xlab="time (h)", ylab="O2 (uM)")
     matplot(x=t, y=Xs[,j], type="l", lty=1, xlab = "", ylab = "", col="red", add=TRUE)
     mtext(paste("R2 =",format(summary(m[[j]])$r.sq,digits=4)), side = 4, line = 1)
-    matplot(t[-1], doxdt, type="l", lty=1, col="black", xlab=name_sample, ylab="dO2/dt (?M/h)",ylim=c(min(doxdt-se.doxdt),max(doxdt+se.doxdt)))
+    matplot(t[-1], doxdt, type="l", lty=1, col="black", xlab=name_sample, ylab="dO2/dt (uM/h)")
     points(t1,doxdt[x1],col="black")
     points(t2,doxdt[x2],col="red")
     abline(v=tstart,col="green")
@@ -81,7 +81,7 @@ for (i in 1:length(datalist)) {
     
     
     #fills dataframe with parameters
-    RRi$sample[j] <- paste(names(datalist)[i],name_sample,sep="_")
+    RRi$sample[j] <- name_sample
     RRi$fit_r2[j] <- summary(m[[j]])$r.sq
     RRi$ox_initial[j] <- Xs[j][1]
     RRi$t_initial[j] <- t[1]
@@ -102,4 +102,4 @@ for (i in 1:length(datalist)) {
 
 dev.off()
 
-write.csv(RR,"all_RR.csv") #save RR
+write.csv(RR,"4.Respiration_rate/all_RR.csv") #save RR

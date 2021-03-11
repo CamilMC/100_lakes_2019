@@ -1,6 +1,33 @@
 #-----
 # Load libraries & functions
 #-----
+
+library("sf")
+library("ggrepel")
+library("dplyr")
+library(writexl)
+library(readxl)
+library(ggplot2)
+library(dendextend)
+library("effectsize")
+library(factoextra)
+library(viridisLite)
+library(reshape2)
+library(mice)
+library(miceadds)
+library(glmnet)
+library(glmnetUtils)
+library(rstatix)
+
+source("8.version_control/100lakes_analysis_functions.R")
+source("8.version_control/bacteria.R")
+
+norgemap <- st_read("3.Maps/TM_WORLD_BORDERS-0.3.shp")
+
+library("rnaturalearth")
+library(rgeos)
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
 #-----
 # Load data
 #-----

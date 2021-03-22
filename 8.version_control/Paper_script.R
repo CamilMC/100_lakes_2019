@@ -2,6 +2,7 @@
 # Load libraries & functions
 #-----
 
+
 library("sf")
 library("ggrepel")
 library("dplyr")
@@ -18,6 +19,8 @@ library(miceadds)
 library(glmnet)
 library(glmnetUtils)
 library(rstatix)
+library(Metrics)
+library(rlist)
 
 source("8.version_control/100lakes_analysis_functions.R")
 source("8.version_control/bacteria.R")
@@ -156,7 +159,7 @@ dev.off()
 #-----
 # create multiple imputation datasets to fill NA -----
 param2remove <- c("auc","width","OD","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week","tmax","tmax_h","ox_initial","F","pH_bio","EC_bio","NO2","NO3","DNA","p_N2","p_O2","c_O2","p_CO2","c_CO2","p_CH4","p_N2O","d18O","d2H","Tso","a254","a400","a410","a600","a275","a295","s_275_295","a350","a400","s_350_400","lag_bdg","H","NP","CNP","dist_bact","PO4")
-param2keep <- c("RR","BdgT","T","pH","EC","Cells","DOC","DN","DP","CN","CP","Alkalinity","Cl","B","SO4","Na","K","Ca","Mg","Fe","Al","Hg_total","SUVA","SARuv","SARvis","SR","sVISa","O2","CO2","CH4","N2O","p_O2","c_O2","p_CO2","c_CO2","p_CH4","p_N2O")
+param2keep <- c("RR","BdgT","T","pH","EC","Cells","DOC","DN","DP","CN","CP","Alkalinity","Cl","B","SO4","Na","K","Ca","Mg","Fe","Al","SUVA","SARuv","SARvis","SR","sVISa","O2","CO2","CH4","N2O","p_O2","c_O2","p_CO2","c_CO2","p_CH4")
 lakes73u <- lakes73num %>% dplyr::select(which(names(lakes73num)%in% param2keep))
 lakes73u$RRn <- lakes73u$RR/lakes73u$DOC
 write_xlsx(lakes73u,"8.version_control/lakes73u.xlsx")
@@ -504,9 +507,9 @@ rmse(lakes73u$RRn,RRn_predicted)
 # MICE on log lakes73 
 #----- 
 # mice on lakes73log -----
-lakes73log <- lakes73u %>% select(!which(names(lakes73u) %in% c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4","p_N2O"))) %>% log10()
+lakes73log <- lakes73u %>% select(!which(names(lakes73u) %in% c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4"))) %>% log10()
 names(lakes73log) <- paste("log",names(lakes73log),sep="")
-lakes73log <- cbind(lakes73log,select(lakes73u,c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4","p_N2O")))
+lakes73log <- cbind(lakes73log,select(lakes73u,c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4")))
 
 pdf("8.version_control/lakes73log_distribution.pdf")
 lakes73log$Lake_ID <- lakes73$Lake_ID
@@ -528,10 +531,10 @@ write_xlsx(lasso_RRlog$lasso_coef,"8.version_control/lasso_coef_logRR.xlsx")
 plot(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)+abline(a=0,b=1)
 rmse(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)
 
-lm_RRlog <- with(RRlogmice,lm(logRR~logCN+logCP+c_O2+Cells+c_CO2+SARuv+logHg_total+logMg+logFe+logCH4+SUVA))
+lm_RRlog <- with(RRlogmice,lm(logRR~logCN+logCP+c_O2+Cells+c_CO2+SARuv+logMg+logFe+logCH4+SUVA))
 lm_RRlog_pooled <- pool(lm_RRlog) %>% summary()
 
-lm_RRlog_predict <- with(RRlogmice,predict(lm(logRR~logCN+logCP+c_O2+Cells+c_CO2+SARuv+logHg_total+logMg+logFe+logCH4+SUVA)))
+lm_RRlog_predict <- with(RRlogmice,predict(lm(logRR~logCN+logCP+c_O2+Cells+c_CO2+SARuv+logMg+logFe+logCH4+SUVA)))
 RRlog_predicted <- list.cbind(lm_RRlog_predict$analyses) %>% rowMeans()
 
 rmse(lakes73log$logRR,RRlog_predicted)

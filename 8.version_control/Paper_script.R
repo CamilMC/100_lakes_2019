@@ -154,6 +154,126 @@ dev.off()
 #-----
 # Maps
 #-----
+
+ggplot(lakes73)+geom_text(aes(x=incub_date,y=RR,col=incub_date,label=Lake_ID),size=5,show.legend = F)+
+  theme_light(base_size=20)+theme(legend.position = "none",axis.text.x = element_text(angle = 45))+
+  scale_color_brewer(palette="Paired")
+ggplot(lakes73)+geom_text(aes(x=incub_date,y=RR,col=DOC,label=Lake_ID),size=5,show.legend = T)+
+  theme_light(base_size=20)+theme(axis.text.x = element_text(angle = 30))+
+  scale_color_viridis_c(direction = -1, end = 0.8)
+ggplot() + geom_sf(data=world,fill = "white") + coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=incub_date,size=RR))+
+  geom_point(data=lakes8,aes(x=Long,y=Lat),col="black",size=5,shape="*")+
+  scale_color_brewer(palette="Paired")+
+  theme_void(base_size = 24)+labs(col="Incubation date")
+ggplot() + geom_sf(data=world,fill = "white") + coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=incub_date,size=DOC))+
+  geom_point(data=lakes8,aes(x=Long,y=Lat),col="black",size=5,shape="*")+
+  scale_color_brewer(palette="Paired")+
+  theme_void(base_size = 24)+labs(col="Incubation date")
+ggplot(lakes73num)+geom_text(aes(x=BdgT,y=RR,label=Lake_ID))+theme_light(base_size=20)
+ggplot(lakes73num)+geom_text(aes(x=SARuv,y=BdgT,label=Lake_ID))+theme_light(base_size=20)
+
+
+pdf("5.100_lakes/RR_maps.pdf",width=10,height=10)
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=RR),size=5)+ 
+  geom_point(data=filter(lakes73,RR >8),aes(x=Long,y=Lat,size=RR))+scale_size(limits=c(8,30),breaks=c(10,20,30),range=c(4,6))+
+  theme_void(base_size = 24)+labs(x="",y="",col=expression(atop("RR",paste("(",mu,"mol/L/h)"))),size="outliers")+
+  scale_color_gradientn(colors = viridis(9,direction = -1,end=0.9),limits=c(0,8))+
+  #geom_text(data=filter(lakes73,RR>8),aes(x=Long,y=Lat,label=round(RR,0)),nudge_y=0.1)+
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.87,.45))+
+  xlim(5,15)+ylim(58,63)
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=RR.OD),size=5)+
+  theme_void(base_size = 24)+labs(x="",y="",col=expression(atop("RR/OD",(h^{-1}))))+
+  scale_color_viridis_c(direction = -1, end = 0.9)+
+  theme(legend.position = c(.9,.45))+
+  xlim(5,15)+ylim(58,63)
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=RR.OD),size=5)+
+  geom_point(data=filter(lakes73,RR.OD >2),aes(x=Long,y=Lat,size=RR.OD))+scale_size(limits=c(2,10),breaks=c(3,5,10),range=c(4,6))+
+  theme_void(base_size = 24)+labs(x="",y="",col=expression(atop("RR/DOC",(h^{-1}))),size="outliers")+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,2))+
+  #geom_text(data=filter(lakes73,RR.OD >2),aes(x=Long,y=Lat,label=round(RR.OD,2)),nudge_y = -0.09,nudge_x = -0.1)+
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.87,.45))+
+  xlim(5,15)+ylim(58,63)
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=OD.DOC),size=4)+
+  theme_void(base_size = 24)+labs(x="",y="",col="%DOC\nconsumed",size="outliers")+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,4))+
+  geom_point(data=filter(lakes73,OD.DOC >4),aes(x=Long,y=Lat,size=OD.DOC))+scale_size(limits=c(4,20),breaks=c(5,10,15),range=c(4,6))+
+  #  geom_text(data=filter(lakes73,OD.DOC >3),aes(x=Long,y=Lat,label=round(OD.DOC,2)),nudge_y = -0.09,nudge_x = -0.1)+  
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.87,.5))+
+  xlim(5,15)+ylim(58,63)
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=OD),size=4)+
+  theme_void(base_size = 24)+labs(x="",y="",col="OD\n(umol/L)")+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,30))+
+  geom_text(data=filter(lakes73,OD >30),aes(x=Long,y=Lat,label=round(OD,0)),nudge_y = -0.09,nudge_x = -0.1)+  
+  theme(legend.position = c(.9,.7))+
+  xlim(5,15)+ylim(58,63)
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=DN),size=4)+
+  geom_point(data=filter(lakes73,DN > 0.6),aes(x=Long,y=Lat,size= DN))+scale_size(limits=c(0.6,0.9))+
+  theme_void(base_size = 24)+labs(x="",y="",col="DN\nmg/L",size="Outliers")+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,0.6))+
+  #  geom_text(data=filter(lakes73,DN > 0.6),aes(x=Long,y=Lat,label=round(DN,1)),nudge_y = -0.09,nudge_x = -0.1)+  
+  theme(legend.position = c(.9,.6))+
+  xlim(5,15)+ylim(58,63)
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=DP),size=4)+
+  geom_point(data=filter(lakes73,DP > 10),aes(x=Long,y=Lat,size= DP))+scale_size(limits=c(10,16))+
+  theme_void(base_size = 24)+labs(x="",y="",col="DP\nug/L",size="Outliers")+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,10))+
+  #  geom_text(data=filter(lakes73,DN > 0.6),aes(x=Long,y=Lat,label=round(DN,1)),nudge_y = -0.09,nudge_x = -0.1)+  
+  theme(legend.position = c(.9,.6))+
+  xlim(5,15)+ylim(58,63)
+
+ggplot() + geom_sf(data=world,fill = "white") + coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=CN),size=3)+
+  geom_point(data=filter(lakes73,CN > 0.050),aes(x=Long,y=Lat,size= CN))+scale_size(limits=c(0.05,0.5))+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(0,0.05))+
+  theme_void(base_size = 20)+labs(col="CN")
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=CN),size=4)+
+  #  geom_point(data=filter(lakes73,CN > 50),aes(x=Long,y=Lat,size= CN))+scale_size(limits=c(50,150),range=c(4,6),breaks=c(50,100,150))+
+  theme_void(base_size = 24)+labs(x="",y="",col="CN",size="Outliers")+
+  # scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9))+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(8,50))+
+  # geom_text(data=filter(lakes73,DN > 0.6),aes(x=Long,y=Lat,label=round(DN,1)),nudge_y = -0.09,nudge_x = -0.1)+ 
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.9,.6))+
+  xlim(5,15)+ylim(58,63)
+
+ggplot()+geom_sf(data=norgemap)+ geom_point(data=lakes73,aes(x=Long,y=Lat,col=DOC),size=5)+
+  #geom_point(data=filter(lakes73,DOC > 20),aes(x=Long,y=Lat,size= DOC))+scale_size(limits=c(20,21))+
+  theme_void(base_size = 26)+labs(x="",y="",col="DOC\nmg/L",size="Outliers")+
+  # scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9))+
+  scale_color_gradientn(colors = viridis(6,direction = -1,end=0.9),limits=c(1,20))+
+  #  geom_text(data=filter(lakes73,DOC > 15),aes(x=Long,y=Lat,label=round(DOC,1)),nudge_y = -0.1,nudge_x = -0.0)+ 
+  guides(color=guide_legend(order=1),size = guide_legend(order=2))+
+  theme(legend.position = c(.75,.2))+
+  xlim(5,15)+ylim(58,63)
+
+dev.off()
+
+
+ggplot() + geom_sf(data=world,fill = "white") + coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=Lake_ID),size=3)+
+  geom_text_repel(data=lakes73,aes(x=Long,y=Lat,col=Lake_ID,label=Lake_ID),nudge_y=0.1)+
+  scale_color_viridis_c()+theme_void(base_size = 20)
+
+ggsave("8.version_control/map_LakeID.jpeg",width=15,height=10)
+
+ggplot() + geom_sf(data=world,fill = "white") + coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=lakes73,aes(x=Long,y=Lat,col=DOC,size=DOC))+
+  scale_color_gradientn(colors = viridis(6,direction = -1, begin = 0.3, end=0.9))+scale_size(range = c(2.5,8))+
+  guides(color = guide_legend(),size=guide_legend())+theme_void(base_size = 24)
+ggsave("8.version_control/map_DOC.jpeg",width=15,height=10)
+
 #-----
 # MICE on lakes73 
 #-----
@@ -245,8 +365,11 @@ ggsave("8.version_control/r_RR.png",width=10,height = 6)
 png("8.version_control/RR_corplot.png")
 RR_corvar <- filter(pearson_pooled,p_value <= 0.05) %>% pull("param")
 RR_cor <- micombine.cor(RRmice,variables = c("RR",RR_corvar), method="pearson") 
-corrplot::corrplot(corr = attr(RR_cor,"r_matrix"), p.mat = attr(RR_cor,"p_matrix"),sig.level = 0.005, order="AOE",
-                   method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,cl.pos = "n")
+matrix_RR_cor <- attr(RR_cor,"r_matrix")
+colnames(matrix_RR_cor) <- c("log(DOC)","log(RR)", "log(C:N)","log(C:P)")
+rownames(matrix_RR_cor) <- c("log(DOC)","log(RR)", "log(C:N)","log(C:P)")
+matrix_RR_p <-attr(RR_cor,"p_value")
+corrplot::corrplot(corr = matrix_RR_cor,  p.mat = matrix_RR_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
 dev.off()
 
 
@@ -384,7 +507,7 @@ ggsave("8.version_control/spearman_bdgt.png",width=8,height = 5)
 png("8.version_control/BdgT_cor.png")
 corvar_BdgT <- filter(pearson_pooled_bdgT,p_value <=0.05) %>% pull("param")
 BdgT_cor <- micombine.cor(RRmice,variables = c("BdgT",corvar_BdgT))
-corrplot::corrplot(corr = attr(BdgT_cor,"r_matrix"),  p.mat = attr(BdgT_cor,"p_value"), method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
+corrplot::corrplot(corr = attr(BdgT_cor,"r_matrix"),  p.mat = attr(BdgT_cor,"p_value"), method = "number",type = "upper",tl.cex = 1.3, tl.col = "black", number.cex = 1.3,hclust="ward",cl.pos = "n")
 dev.off()
 
 png("8.version_control/BdgT_s_corplot.png",width = 600, height = 600)
@@ -410,7 +533,7 @@ rmse(lakes73$BdgT,BdgT_predicted)
 
 # Pearson for RRn -----
 
-predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("BdgT","RR","RRn"))]
+predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("BdgT","RRn"))]
 
 pearson_pooled_RRn <- predvar %>% as.data.frame() %>% setNames("param")
 estimates <- c()
@@ -439,7 +562,7 @@ g <- ggplot(data = filter(pearson_pooled_RRn,p_value <= 0.04),aes(x=reorder(para
   scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
                        breaks = c(0,0.02,0.04, 0.06),labels = c("0","0.02","0.04","0.06"),limits = c(0,0.06), 
                        guide="legend")+
-  xlab("")+ ylim(-0.5,0.5)
+  xlab("")+ ylim(-0.5,1)
 print(g)
 ggsave("8.version_control/pearson_RRn.png", width=8,height = 5)
 
@@ -478,7 +601,7 @@ ggsave("8.version_control/spearman_RRn.png",width=15,height = 5)
 # miceadds corplots RRn -----
 png("8.version_control/RRn_corplot.png")
 RRn_corvar <- filter(pearson_pooled_RRn,p_value <= 0.05) %>% pull("param")
-RRn_cor <- micombine.cor(RRmice,variables = c("RRn","RR","DOC",RRn_corvar)) 
+RRn_cor <- micombine.cor(RRmice,variables = c("RRn",RRn_corvar)) 
 corrplot::corrplot(corr = attr(RRn_cor,"r_matrix"), p.mat = attr(RRn_cor,"p_matrix"), order="hclust",hclust="centroid",
                    method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
 dev.off()
@@ -509,7 +632,11 @@ rmse(lakes73u$RRn,RRn_predicted)
 # mice on lakes73log -----
 lakes73log <- lakes73u %>% select(!which(names(lakes73u) %in% c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4"))) %>% log10()
 names(lakes73log) <- paste("log",names(lakes73log),sep="")
+
+
 lakes73log <- cbind(lakes73log,select(lakes73u,c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4")))
+lakes73log[lakes73log == "-Inf"] <- NA
+
 
 pdf("8.version_control/lakes73log_distribution.pdf")
 lakes73log$Lake_ID <- lakes73$Lake_ID
@@ -518,7 +645,7 @@ hist.df(lakes73log)
 lakes73log$Lake_ID <- NULL
 dev.off()
 
-lakes73log[lakes73log == "-Inf"] <- NA
+
 M <- 50
 set.seed(5)
 RRlogmice <- lakes73log %>% mice(method = "cart", m = M)
@@ -575,7 +702,11 @@ ggsave("8.version_control/pearson_cor_RRlog.png",width= 8,height = 5)
 png("8.version_control/RRlog_cor.png",width=700,height = 700)
 covar_RR <- filter(pearson_pooled_RRlog,p_value <= 0.05) %>% pull("param")
 RR_cor <- micombine.cor(RRlogmice,variables = c("logRR",covar_RR), method="pearson") 
-corrplot::corrplot(corr = attr(RR_cor,"r_matrix"),  p.mat = attr(RR_cor,"p_value"), method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
+matrix_RR_cor <- attr(RR_cor,"r_matrix")
+colnames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
+rownames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
+matrix_RR_p <-attr(RR_cor,"p_value")
+corrplot::corrplot(corr = matrix_RR_cor,  p.mat = matrix_RR_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
 dev.off()
 
 # Spearman log RR -----
@@ -625,10 +756,10 @@ write_xlsx(lasso_BdgTlog$lasso_coef, "8.version_control/lasso_logBdgT.xlsx")
 plot(lakes73log$BdgT,lasso_BdgTlog$lasso_pred$pooled)+abline(a=0,b=1)
 rmse(lakes73log$logBdgT,lasso_BdgTlog$lasso_pred$pooled)
 
-lm_BdgTlog <- with(RRlogmice,lm(logBdgT~c_O2+logAlkalinity+pH+logCa+logDN+Cells))
+lm_BdgTlog <- with(RRlogmice,lm(logBdgT~logDOC+c_O2+pH+logAlkalinity+logDN+Cells+SARuv+logFe+logCO2))
 lm_BdgTlog_pooled <- pool(lm_BdgTlog) %>% summary()
 
-lm_BdgTlog_predict <- with(RRlogmice,predict(lm(logBdgT~c_O2+logAlkalinity+pH+logCa+logDN+Cells)))
+lm_BdgTlog_predict <- with(RRlogmice,predict(lm(logBdgT~logDOC+c_O2+pH+logAlkalinity+logDN+Cells+SARuv+logFe+logCO2)))
 BdgTlog_predicted <- list.cbind(lm_BdgTlog_predict$analyses) %>% rowMeans()
 
 rmse(lakes73log$logBdgT,BdgTlog_predicted)
@@ -669,8 +800,12 @@ ggsave("8.version_control/pearson_cor_BdgTlog.png",width= 8,height = 5)
 
 png("8.version_control/BdgTlog_cor.png",width=700,height = 700)
 covar_BdgT <- filter(pearson_pooled_BdgTlog,p_value <= 0.05) %>% pull("param")
-BdgT_cor <- micombine.cor(RRlogmice,variables = c("logBdgT",covar_BdgT), method="pearson") 
-corrplot::corrplot(corr = attr(BdgT_cor,"r_matrix"),  p.mat = attr(BdgT_cor,"p_value"), method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
+BdgT_cor <- micombine.cor(RRlogmice,variables = c("logBdgT",covar_BdgT), method="pearson")
+matrix_BdgT_cor <- attr(BdgT_cor,"r_matrix")
+colnames(matrix_BdgT_cor) <- c("log(DN)","log(Alkalinity)","log(SO4)","log(K)","log(Ca)","log(Mg)","log(O2)","log(BdgT)","pH","c_O2")
+rownames(matrix_BdgT_cor) <- c("log(DN)","log(Alkalinity)","log(SO4)","log(K)","log(Ca)","log(Mg)","log(O2)","log(BdgT)","pH","c_O2")
+matrix_BdgT_p <-attr(BdgT_cor,"p_value")
+corrplot::corrplot(corr = matrix_BdgT_cor,  p.mat = matrix_BdgT_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
 dev.off()
 
 # Spearman log BdgT -----
@@ -721,17 +856,17 @@ write_xlsx(lasso_RRnlog$lasso_coef,"8.version_control/lasso_coef_logRRn.xlsx")
 plot(lakes73log$logRRn,lasso_RRnlog$lasso_pred$pooled)+abline(a=0,b=1)
 rmse(lakes73log$logBdgT,lasso_RRnlog$lasso_pred$pooled)
 
-lm_RRnlog <- with(RRlogmice,lm(logRRn~c_O2+SR+pH+c_CO2+SARuv+logNa+logFe+logMg+logCH4+logHg_total+logDP+logDN+SUVA))
+lm_RRnlog <- with(RRlogmice,lm(logRRn~SR+c_O2+pH+c_CO2+SARuv+logMg+logFe+logNa+logCH4+logDP+logDN+SUVA))
 lm_RRnlog_pooled <- pool(lm_RRnlog) %>% summary()
 
-lm_RRnlog_predict <- with(RRlogmice,predict(lm(logRRn~c_O2+SR+pH+c_CO2+SARuv+logNa+logFe+logMg+logCH4+logHg_total+logDP+logDN+SUVA)))
+lm_RRnlog_predict <- with(RRlogmice,predict(lm(logRRn~SR+c_O2+pH+c_CO2+SARuv+logMg+logFe+logNa+logCH4+logDP+logDN+SUVA)))
 RRnlog_predicted <- list.cbind(lm_RRnlog_predict$analyses) %>% rowMeans()
 
 plot(lakes73log$logRRn,RRnlog_predicted)+abline(a=0,b=1)
 rmse(lakes73log$logRRn,RRnlog_predicted)
 
 # Pearson log RRn -----
-predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("logRR"))]
+predvar <- names(lakes73log)[-which(names(lakes73log) == "logRRn")]
 pearson_pooled_RRnlog <- predvar %>% as.data.frame() %>% setNames("param")
 estimates <- c()
 p_values <- c()
@@ -764,8 +899,11 @@ ggsave("8.version_control/pearson_RRnlog.png",width= 8,height = 5)
 
 
 png("8.version_control/RRnlog_cor.png",width=700,height = 700)
-covar_RRn <- filter(pearson_pooled_RRnlog,p_value <= 0.05) %>% filter(abs(r) > 0.45) %>% pull("param")
+covar_RRn <- filter(pearson_pooled_RRnlog,p_value <= 0.05) %>% filter(abs(r) > 0.4) %>% pull("param")
 RRn_cor <- micombine.cor(RRlogmice,variables = c("logRRn",covar_RRn), method="pearson") 
-corrplot::corrplot(corr = attr(RRn_cor,"r_matrix"),  p.mat = attr(RRn_cor,"p_value"), method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
+matrix_RRn_cor <- attr(RRn_cor,"r_matrix")
+colnames(matrix_RRn_cor) <- c("log(DOC)","log(DN)","log(EC)","log(Cl)","log(B)","log(Na)","log(K)","log(Mg)","log(CH4)","log(RR)", "log(RRn)","SUVA","SR")
+rownames(matrix_RRn_cor) <- c("log(DOC)","log(DN)","log(EC)","log(Cl)","log(B)","log(Na)","log(K)","log(Mg)","log(CH4)","log(RR)", "log(RRn)","SUVA","SR")
+matrix_RRn_p <-attr(RRn_cor,"p_value")
+corrplot::corrplot(corr = matrix_RRn_cor,  p.mat = matrix_RRn_p, method = "number",type = "upper",tl.cex = 1.3, tl.col = "black", number.cex = 1.3,hclust="ward",cl.pos = "n")
 dev.off()
-

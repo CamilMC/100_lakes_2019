@@ -21,6 +21,7 @@ library(glmnetUtils)
 library(rstatix)
 library(Metrics)
 library(rlist)
+library(plotmo)
 
 source("8.version_control/100lakes_analysis_functions.R")
 source("8.version_control/bacteria.R")
@@ -75,6 +76,27 @@ h <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=BdgT),outlier.size = 3,width=
 print(h)
 ggsave("boxplot_BdgT.png",width=4,height=6)
        
+i <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(RR)))
+outliers <- ggplot_build(i)[["data"]][[1]][["outliers"]] %>% as.data.frame()
+outliers_ID <-  filter(lakes73, log(lakes73$RR) %in% outliers[[1]]) %>% dplyr::select(Lake_name)
+outliers$Lake_ID <- outliers_ID$Lake_name
+names(outliers) <- c("RR","Lake_name")
+i <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(RR)),outlier.size = 3, width = 1.5)+theme_light(base_size = 20)+xlab("")+ylab("log(RR)")+
+  geom_text_repel(data=outliers,aes(x="",y=outliers[,"RR"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
+print(i)
+ggsave("boxplot_logRR.png",width=4,height=6)
+
+j <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(BdgT)))
+outliers <- ggplot_build(j)[["data"]][[1]][["outliers"]] %>% as.data.frame()
+outliers_ID <-  filter(lakes73, log(lakes73$BdgT) %in% outliers[[1]]) %>% dplyr::select(Lake_name)
+outliers$Lake_ID <- outliers_ID$Lake_name
+names(outliers) <- c("BdgT","Lake_name")
+j <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(BdgT)),outlier.size = 3, width = 1.5)+theme_light(base_size = 20)+xlab("")+ylab("log(BdgT)")+
+  geom_text_repel(data=outliers,aes(x="",y=outliers[,"BdgT"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
+print(j)
+ggsave("boxplot_logBdgT.png",width=4,height=6)
+
+
 boxplots <- function(df,coef_out){
   for(i in names(df)[-1]){
     g <- ggplot()+geom_boxplot(data=df,aes(x=i,y=df[,i]),coef=coef_out)
@@ -151,9 +173,9 @@ dev.off()
 pdf("5.100_lakes/all.parameters.correlations.pdf",width=15,height = 8)
 sapply(names(lakes73),print.cor.signif2, df=lakes73)
 dev.off()
-#-----
+# -----
 # Maps
-#-----
+# -----
 
 ggplot(lakes73)+geom_text(aes(x=incub_date,y=RR,col=incub_date,label=Lake_ID),size=5,show.legend = F)+
   theme_light(base_size=20)+theme(legend.position = "none",axis.text.x = element_text(angle = 45))+
@@ -328,6 +350,46 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
   
 }
 
+milasso2 <- function(mice.object,M,resp.var,excluded.var){
+  
+  n <- dim(mice.object$data)[1] 
+  lasso_coef <- c("Intercept",names(dplyr::select(mice.object$data,!c(resp.var,excluded.var)))) %>% as.data.frame() %>% setNames("param")
+  lasso_pred <- c(rep(NA,n)) %>% as.data.frame()
+  
+  
+  for (z in 1:M){
+    lasso_coef %>% tibble::add_column(z=NA)
+    data <- complete(mice.object,z) %>% dplyr::select(!excluded.var)
+    set.seed(5)
+    lasso.formula <- as.formula(paste(resp.var,"~.",sep=""))
+    fit <- cv.glmnet(formula = lasso.formula,data = data)
+    coef_fit <- fit %>% coef(s="lambda.min") %>% summary()
+    
+    for (w in 1:dim(coef_fit)[1]){
+      lasso_coef[coef_fit[w,1],z+1] <- coef_fit[w,3]
+    }
+    
+    newmat <- complete(mice.object,z) %>% dplyr::select(!c(resp.var,excluded.var)) 
+    lasso_pred[,z] <- predict(fit,newmat[1:n,],s="lambda.min")
+  }
+  
+  lasso_coef$pooled <- NA
+  lasso_coef$number <- NA
+  lasso_pred$pooled <- rowMeans(lasso_pred)
+  
+  
+  for(x in 1:length(lasso_coef$param)){
+    estimates <- lasso_coef[x,] %>% dplyr::select(c(1:M+1)) %>% as.numeric()
+    lasso_coef$pooled[x] <- mean(estimates,na.rm = T)
+    lasso_coef$number[x] <- M - sum(is.na(estimates))
+  }
+  
+  final <- list(lasso_coef,lasso_pred)
+  names(final) <- c("lasso_coef","lasso_pred")
+  return(final)
+  
+}
+
 #-----
 # Pearson for RR -----
 predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("RR","RRn"))]
@@ -366,10 +428,10 @@ png("8.version_control/RR_corplot.png")
 RR_corvar <- filter(pearson_pooled,p_value <= 0.05) %>% pull("param")
 RR_cor <- micombine.cor(RRmice,variables = c("RR",RR_corvar), method="pearson") 
 matrix_RR_cor <- attr(RR_cor,"r_matrix")
-colnames(matrix_RR_cor) <- c("log(DOC)","log(RR)", "log(C:N)","log(C:P)")
-rownames(matrix_RR_cor) <- c("log(DOC)","log(RR)", "log(C:N)","log(C:P)")
+colnames(matrix_RR_cor) <- c("DOC","RR", "C:N","C:P")
+rownames(matrix_RR_cor) <- c("DOC","RR", "C:N","C:P")
 matrix_RR_p <-attr(RR_cor,"p_value")
-corrplot::corrplot(corr = matrix_RR_cor,  p.mat = matrix_RR_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
+corrplot::corrplot(corr = matrix_RR_cor,  p.mat = matrix_RR_p, method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,hclust="ward",cl.pos = "n")
 dev.off()
 
 
@@ -636,8 +698,7 @@ names(lakes73log) <- paste("log",names(lakes73log),sep="")
 
 lakes73log <- cbind(lakes73log,select(lakes73u,c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4")))
 lakes73log[lakes73log == "-Inf"] <- NA
-
-
+ 
 pdf("8.version_control/lakes73log_distribution.pdf")
 lakes73log$Lake_ID <- lakes73$Lake_ID
 boxplots(lakes73log,0.95)
@@ -645,26 +706,63 @@ hist.df(lakes73log)
 lakes73log$Lake_ID <- NULL
 dev.off()
 
-
 M <- 50
 set.seed(5)
-RRlogmice <- lakes73log %>% mice(method = "cart", m = M)
+
+# Correlogram for all independant variables -----
+indvarlogmice <- select(lakes73log,!c("logRR","logRRn","logBdgT")) %>% mice(method = "cart", m = M)
+
+png("8.version_control/big_cor.png",width=1000,height = 1000)
+lakes_cor <- micombine.cor(indvarlogmice, method="pearson") 
+matrix_lakes_cor <- attr(lakes_cor,"r_matrix")
+#colnames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
+#rownames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
+matrix_lakes_p <-attr(lakes_cor,"p_value")
+corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "upper",tl.cex = 0.8, tl.col = "black", number.cex = 0.8,hclust="ward",cl.pos = "n", sig.level = 0.99)
+dev.off()
+
+# RRlogmice -----
+logcovariates <- c("logRR","logRRn","logBdgT","logDOC","logDP","logEC","logFe","logO2","logN2O","logCN","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
+RRlogmice <- select(lakes73log,logcovariates) %>% mice(method = "cart", m = M)
+
+# correlogram for RRlogmice -----
+png("8.version_control/correlogram.png", width= 1000, height = 1000)
+lakes_cor <- micombine.cor(RRlogmice, method="pearson") 
+matrix_lakes_cor <- attr(lakes_cor,"r_matrix")
+colnames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(DP)","log(DC)","log(Fe)","log(O2)","log(N2O)","log(C:N)","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
+rownames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(DP)","log(DC)","log(Fe)","log(O2)","log(N2O)","log(C:N)","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
+matrix_lakes_p <-attr(lakes_cor,"p_value")
+corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n", sig.level = 0.99)
+dev.off()
+
 
 # lasso log RR -----
 
-lasso_RRlog <- milasso(RRlogmice,M,"logRR","logRRn")
+lasso_RRlog <- milasso(RRlogmice,M,"logRR",c("logRRn","logBdgT"))
 write_xlsx(lasso_RRlog$lasso_coef,"8.version_control/lasso_coef_logRR.xlsx")
+
+residuals <- lakes73log$logRR - lasso_RRlog$lasso_pred$pooled
+x <- rnorm(73,0,1)
+
+qqplot(x,residuals,xlab = "Normal distribution",ylab = "residuals",main = "Q-Q plot")
+plot(lasso_RRlog$lasso_pred$pooled,residuals)+abline(h=0)
+plot(ecdf(residuals))
+
 
 plot(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)+abline(a=0,b=1)
 rmse(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)
 
-lm_RRlog <- with(RRlogmice,lm(logRR~logCN+logCP+c_O2+Cells+c_CO2+SARuv+logMg+logFe+logCH4+SUVA))
+lm_RRlog <- with(RRlogmice,lm(logRR~logCN+Cells+c_CO2+SARuv+logFe+logDP+SUVA))
 lm_RRlog_pooled <- pool(lm_RRlog) %>% summary()
 
-lm_RRlog_predict <- with(RRlogmice,predict(lm(logRR~logCN+logCP+c_O2+Cells+c_CO2+SARuv+logMg+logFe+logCH4+SUVA)))
+lm_RRlog_predict <- with(RRlogmice,predict(lm(logRR~logCN+Cells+c_CO2+SARuv+logFe+logDP+SUVA)))
 RRlog_predicted <- list.cbind(lm_RRlog_predict$analyses) %>% rowMeans()
 
 rmse(lakes73log$logRR,RRlog_predicted)
+
+
+
+
 
 # pearson log RR -----
 predvar <- names(lakes73log)[-which(names(lakes73log) %in% c("logRR","logRRn"))]
@@ -750,7 +848,7 @@ corrplot::corrplot(corr = attr(RR_scor,"r_matrix"), p.mat = attr(RR_scor,"p_matr
 dev.off()
 
 # lasso log BdgT ----
-lasso_BdgTlog <- milasso(RRlogmice,M,"logBdgT","logRRn")
+lasso_BdgTlog <- milasso(RRlogmice,M,"logBdgT",c("logRR","logRRn"))
 write_xlsx(lasso_BdgTlog$lasso_coef, "8.version_control/lasso_logBdgT.xlsx")
 
 plot(lakes73log$BdgT,lasso_BdgTlog$lasso_pred$pooled)+abline(a=0,b=1)

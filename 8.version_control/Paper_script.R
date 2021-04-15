@@ -314,7 +314,16 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
   
   n <- dim(mice.object$data)[1] 
   lasso_coef <- c("Intercept",names(dplyr::select(mice.object$data,!c(resp.var,excluded.var)))) %>% as.data.frame() %>% setNames("param")
+  
   lasso_pred <- c(rep(NA,n)) %>% as.data.frame()
+  lasso_res <- c(rep(NA,n)) %>% as.data.frame()
+  
+  lasso_lambda <- matrix(data=NA,nrow = 100, ncol=M) %>% as.data.frame()
+  lasso_cvm <- matrix(data=NA,nrow = 100, ncol=M) %>% as.data.frame()
+  lasso_cvlo <- matrix(data=NA,nrow = 100, ncol=M) %>% as.data.frame()
+  lasso_cvup <- matrix(data=NA,nrow = 100, ncol=M) %>% as.data.frame()
+  lambda_min <- c()
+  lambda_1se <- c()
   
   
   for (z in 1:M){
@@ -324,6 +333,7 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
     lasso.formula <- as.formula(paste(resp.var,"~.",sep=""))
     fit <- cv.glmnet(formula = lasso.formula,data = data)
     coef_fit <- fit %>% coef(s="lambda.min") %>% summary()
+    l <- length(fit$lambda)
     
     for (w in 1:dim(coef_fit)[1]){
       lasso_coef[coef_fit[w,1],z+1] <- coef_fit[w,3]
@@ -331,64 +341,103 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
     
     newmat <- complete(mice.object,z) %>% dplyr::select(!c(resp.var,excluded.var)) 
     lasso_pred[,z] <- predict(fit,newmat[1:n,],s="lambda.min")
+    lasso_res[,z] <- data[,resp.var] - lasso_pred[,z]
+    lasso_lambda[1:l,z] <- fit$lambda
+    lasso_cvm[1:l,z] <- fit$cvm
+    lasso_cvlo[1:l,z] <- fit$cvlo
+    lasso_cvup[1:l,z] <- fit$cvup
+    lambda_min[z] <- fit$lambda.min
+    lambda_1se[z] <- fit$lambda.1se
   }
   
+  # pools lasso_pred and lasso_res
+  lasso_pred$pooled <- rowMeans(lasso_pred)
+  lasso_res$pooled <- rowMeans(lasso_res)
+
+  # pools lambdas
+  
+  lasso_lambda <- lasso_lambda[rowSums(is.na(lasso_lambda)) != ncol(lasso_lambda), ] # removes rows with only NA in lasso_lambda
+  k <- dim(lasso_lambda)[1]
+  
+  lasso_cv <- c(rep(NA,k)) %>% as.data.frame()
+
+  lasso_cv$lambda <- rowMeans(lasso_lambda,na.rm = T)
+  
+  lasso_cvm <- lasso_cvm[rowSums(is.na(lasso_cvm)) != ncol(lasso_cvm), ] # removes rows with only NA in lasso_cvm
+  lasso_cv$cvm <- rowMeans(lasso_cvm,na.rm = T)
+  
+  lasso_cvlo <- lasso_cvlo[rowSums(is.na(lasso_cvlo)) != ncol(lasso_cvlo), ] # removes rows with only NA in lasso_cvlo
+  lasso_cv$cvlo <- rowMeans(lasso_cvlo,na.rm = T)
+  
+  lasso_cvup <- lasso_cvup[rowSums(is.na(lasso_cvup)) != ncol(lasso_cvup), ] # removes rows with only NA in lasso_cvup
+  lasso_cv$cvup <- rowMeans(lasso_cvup,na.rm = T)
+  
+  
+  
+  # plots cross-validation
+  g <- ggplot(lasso_cv,aes(x=log(lambda)))+geom_point(aes(y=cvm),col="red")+
+    geom_errorbar(aes(ymin=cvlo,ymax=cvup),col="gray")+
+    geom_vline(xintercept=log(mean(lambda_min)),linetype = "dashed")+
+    geom_label(aes(x=log(mean(lambda_min)),y=max(cvup)/2,label="\u03bb min",angle=90))+
+    geom_vline(xintercept=log(mean(lambda_1se)), linetype = "dashed")+
+    geom_label(aes(x=log(mean(lambda_1se)),y=max(cvup)/3,label="\u03bb 1se",angle=90))+
+    labs(x="log(\u03bb)",y="Mean squared error")+
+    theme_bw(base_size=20)
+  
+  print(g)
+  
+  # prepares lasso_coef for final file
   lasso_coef$pooled <- NA
   lasso_coef$number <- NA
-  lasso_pred$pooled <- rowMeans(lasso_pred)
   
-  
-  for(x in 1:length(lasso_coef$param)){
+    for(x in 1:length(lasso_coef$param)){
     estimates <- lasso_coef[x,] %>% dplyr::select(c(1:M+1)) %>% as.numeric()
     lasso_coef$pooled[x] <- mean(estimates,na.rm = T)
     lasso_coef$number[x] <- M - sum(is.na(estimates))
   }
 
-  final <- list(lasso_coef,lasso_pred)
-  names(final) <- c("lasso_coef","lasso_pred")
+  final <- list(lasso_coef,lasso_pred,lasso_res,lasso_lambda)
+  names(final) <- c("lasso_coef","lasso_pred","lasso_res","lasso_lambda")
   return(final)
+
   
 }
 
-milasso2 <- function(mice.object,M,resp.var,excluded.var){
-  
-  n <- dim(mice.object$data)[1] 
-  lasso_coef <- c("Intercept",names(dplyr::select(mice.object$data,!c(resp.var,excluded.var)))) %>% as.data.frame() %>% setNames("param")
-  lasso_pred <- c(rep(NA,n)) %>% as.data.frame()
-  
-  
-  for (z in 1:M){
-    lasso_coef %>% tibble::add_column(z=NA)
-    data <- complete(mice.object,z) %>% dplyr::select(!excluded.var)
-    set.seed(5)
-    lasso.formula <- as.formula(paste(resp.var,"~.",sep=""))
-    fit <- cv.glmnet(formula = lasso.formula,data = data)
-    coef_fit <- fit %>% coef(s="lambda.min") %>% summary()
-    
-    for (w in 1:dim(coef_fit)[1]){
-      lasso_coef[coef_fit[w,1],z+1] <- coef_fit[w,3]
-    }
-    
-    newmat <- complete(mice.object,z) %>% dplyr::select(!c(resp.var,excluded.var)) 
-    lasso_pred[,z] <- predict(fit,newmat[1:n,],s="lambda.min")
-  }
-  
-  lasso_coef$pooled <- NA
-  lasso_coef$number <- NA
-  lasso_pred$pooled <- rowMeans(lasso_pred)
-  
-  
-  for(x in 1:length(lasso_coef$param)){
-    estimates <- lasso_coef[x,] %>% dplyr::select(c(1:M+1)) %>% as.numeric()
-    lasso_coef$pooled[x] <- mean(estimates,na.rm = T)
-    lasso_coef$number[x] <- M - sum(is.na(estimates))
-  }
-  
-  final <- list(lasso_coef,lasso_pred)
-  names(final) <- c("lasso_coef","lasso_pred")
-  return(final)
-  
-}
+
+# test to remove ----
+
+
+fit.df <- c(fit$lambda) %>% as.data.frame() %>% setNames("lambda")
+fit.df$cvm <- fit$cvm
+fit.df$cvsd <- fit$cvsd
+fit.df$cvup <- fit$cvup
+fit.df$cvlo <- fit$cvlo
+ggplot(fit.df,aes(x=log(lambda)))+geom_point(aes(y=cvup))+geom_point(aes(y=cvlo))+geom_point(aes(y=cvm),col="red")
+ggplot(fit.df,aes(x=log(lambda)))+geom_point(aes(y=cvm),col="red")+
+  geom_errorbar(aes(ymin=cvlo,ymax=cvup),col="gray")+
+  geom_vline(xintercept=log(fit$lambda.min),linetype = "dashed")+
+  geom_label(aes(x=log(fit$lambda.min),y=max(cvup)/3,label="\u03bb min",angle=90))+
+  geom_vline(xintercept=log(fit$lambda.1se), linetype = "dashed")+
+  geom_label(aes(x=log(fit$lambda.1se),y=max(cvup)/2,label="\u03bb 1se",angle=90))+
+  labs(x="log(\u03bb)",y="Mean squared error")+
+  theme_bw(base_size=20)
+
+matrex <- as.matrix(select(lakes73log,c(logDP,logCN,SUVA)))
+respx <- lakes73log$logRR
+test <- glmnet(matrex,respx)
+plot_glmnet(test,label = T,xvar="rlambda")
+plotres(test,predict.s = test$lambda[10])
+
+cv.test <- cv.glmnet(matrex,respx)
+plot(cv.test)
+plotres(cv.test,predict.s="lambda.1se")
+
+plotres(test,predict.s = cv.test$lambda.min)
+
+y <- predict(test,matrex,s=cv.test$lambda.min,exact = T,x=matrex,y=respx)
+plotres(test,predict.s=cv.test$lambda.min,predict.exact = T, predict.x = matrex,predict.y=respx)
+
+class(lasso_RRlog)
 
 #-----
 # Pearson for RR -----
@@ -741,17 +790,38 @@ dev.off()
 lasso_RRlog <- milasso(RRlogmice,M,"logRR",c("logRRn","logBdgT"))
 write_xlsx(lasso_RRlog$lasso_coef,"8.version_control/lasso_coef_logRR.xlsx")
 
-residuals <- lakes73log$logRR - lasso_RRlog$lasso_pred$pooled
-x <- rnorm(73,0,1)
 
-qqplot(x,residuals,xlab = "Normal distribution",ylab = "residuals",main = "Q-Q plot")
-plot(lasso_RRlog$lasso_pred$pooled,residuals)+abline(h=0)
+# residual plots MAKE FUNCTION -----
+# QQ plot
+x <- rnorm(73,0,1)
+qqplot(y,lasso_RRlog$lasso_res$pooled,xlab = "Normal distribution",ylab = "residuals",main = "Q-Q plot")
+qqnorm(lasso_RRlog$lasso_res$pooled,xlab = "Normal distribution",ylab = "residuals",main = "Q-Q plot")
+qqline(lasso_RRlog$lasso_res$pooled)
+
+# residual vs predicted
+x <- lasso_RRlog$lasso_pred$pooled
+y <- lasso_RRlog$lasso_res$pooled
+z <- loess(y~x)
+j <- order(x)
+plot(x,y,xlab = "Predicted", ylab = "Residuals") + abline(h=0)
+lines(x[j],z$fitted[j],col="red",lwd=2,type="l")
+
+# standardized residuals vs predicted
+w <- loess((y/sd(y))~x)
+plot(x,(y/sd(y)),xlab = "Predicted",ylab = "Standardised residuals") + abline(h=0)
+lines(x[j],w$fitted[j],col="red",lwd = 2, type = "l")
+
+# cumulative distribution
 plot(ecdf(residuals))
+
+# lambda selection???
+
 
 
 plot(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)+abline(a=0,b=1)
 rmse(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)
 
+# linear model log RR ----- 
 lm_RRlog <- with(RRlogmice,lm(logRR~logCN+Cells+c_CO2+SARuv+logFe+logDP+SUVA))
 lm_RRlog_pooled <- pool(lm_RRlog) %>% summary()
 
@@ -849,7 +919,7 @@ dev.off()
 
 # lasso log BdgT ----
 lasso_BdgTlog <- milasso(RRlogmice,M,"logBdgT",c("logRR","logRRn"))
-write_xlsx(lasso_BdgTlog$lasso_coef, "8.version_control/lasso_logBdgT.xlsx")
+?write_xlsx(lasso_BdgTlog$lasso_coef, "8.version_control/lasso_logBdgT.xlsx")
 
 plot(lakes73log$BdgT,lasso_BdgTlog$lasso_pred$pooled)+abline(a=0,b=1)
 rmse(lakes73log$logBdgT,lasso_BdgTlog$lasso_pred$pooled)

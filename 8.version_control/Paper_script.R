@@ -22,6 +22,9 @@ library(rstatix)
 library(Metrics)
 library(rlist)
 library(plotmo)
+library(gridExtra)
+library(grid)
+
 
 source("8.version_control/100lakes_analysis_functions.R")
 source("8.version_control/bacteria.R")
@@ -312,8 +315,10 @@ RRmice <- lakes73u %>% mice(method = "cart",m = M)
 # lasso function for mice objects -----
 milasso <- function(mice.object,M,resp.var,excluded.var){
   
+  lasso_raw <- mice.object$data[,resp.var]
+  
   n <- dim(mice.object$data)[1] 
-  lasso_coef <- c("Intercept",names(dplyr::select(mice.object$data,!c(resp.var,excluded.var)))) %>% as.data.frame() %>% setNames("param")
+  lasso_coef <- c("Intercept",names(dplyr::select(mice.object$data,!c(all_of(resp.var),all_of(excluded.var))))) %>% as.data.frame() %>% setNames("param")
   
   lasso_pred <- c(rep(NA,n)) %>% as.data.frame()
   lasso_res <- c(rep(NA,n)) %>% as.data.frame()
@@ -372,20 +377,6 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
   lasso_cvup <- lasso_cvup[rowSums(is.na(lasso_cvup)) != ncol(lasso_cvup), ] # removes rows with only NA in lasso_cvup
   lasso_cv$cvup <- rowMeans(lasso_cvup,na.rm = T)
   
-  
-  
-  # plots cross-validation
-  g <- ggplot(lasso_cv,aes(x=log(lambda)))+geom_point(aes(y=cvm),col="red")+
-    geom_errorbar(aes(ymin=cvlo,ymax=cvup),col="gray")+
-    geom_vline(xintercept=log(mean(lambda_min)),linetype = "dashed")+
-    geom_label(aes(x=log(mean(lambda_min)),y=max(cvup)/2,label="\u03bb min",angle=90))+
-    geom_vline(xintercept=log(mean(lambda_1se)), linetype = "dashed")+
-    geom_label(aes(x=log(mean(lambda_1se)),y=max(cvup)/3,label="\u03bb 1se",angle=90))+
-    labs(x="log(\u03bb)",y="Mean squared error")+
-    theme_bw(base_size=20)
-  
-  print(g)
-  
   # prepares lasso_coef for final file
   lasso_coef$pooled <- NA
   lasso_coef$number <- NA
@@ -396,346 +387,133 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
     lasso_coef$number[x] <- M - sum(is.na(estimates))
   }
 
-  final <- list(lasso_coef,lasso_pred,lasso_res,lasso_lambda)
-  names(final) <- c("lasso_coef","lasso_pred","lasso_res","lasso_lambda")
+  final <- list(lasso_raw, lasso_coef,lasso_pred,lasso_res,lasso_lambda,lasso_cv,lambda_min,lambda_1se)
+  names(final) <- c("lasso_raw","lasso_coef","lasso_pred","lasso_res","lasso_lambda","lasso_cv","lambda_min","lambda_1se")
   return(final)
 
   
 }
 
-
-# test to remove ----
-
-
-fit.df <- c(fit$lambda) %>% as.data.frame() %>% setNames("lambda")
-fit.df$cvm <- fit$cvm
-fit.df$cvsd <- fit$cvsd
-fit.df$cvup <- fit$cvup
-fit.df$cvlo <- fit$cvlo
-ggplot(fit.df,aes(x=log(lambda)))+geom_point(aes(y=cvup))+geom_point(aes(y=cvlo))+geom_point(aes(y=cvm),col="red")
-ggplot(fit.df,aes(x=log(lambda)))+geom_point(aes(y=cvm),col="red")+
-  geom_errorbar(aes(ymin=cvlo,ymax=cvup),col="gray")+
-  geom_vline(xintercept=log(fit$lambda.min),linetype = "dashed")+
-  geom_label(aes(x=log(fit$lambda.min),y=max(cvup)/3,label="\u03bb min",angle=90))+
-  geom_vline(xintercept=log(fit$lambda.1se), linetype = "dashed")+
-  geom_label(aes(x=log(fit$lambda.1se),y=max(cvup)/2,label="\u03bb 1se",angle=90))+
-  labs(x="log(\u03bb)",y="Mean squared error")+
-  theme_bw(base_size=20)
-
-matrex <- as.matrix(select(lakes73log,c(logDP,logCN,SUVA)))
-respx <- lakes73log$logRR
-test <- glmnet(matrex,respx)
-plot_glmnet(test,label = T,xvar="rlambda")
-plotres(test,predict.s = test$lambda[10])
-
-cv.test <- cv.glmnet(matrex,respx)
-plot(cv.test)
-plotres(cv.test,predict.s="lambda.1se")
-
-plotres(test,predict.s = cv.test$lambda.min)
-
-y <- predict(test,matrex,s=cv.test$lambda.min,exact = T,x=matrex,y=respx)
-plotres(test,predict.s=cv.test$lambda.min,predict.exact = T, predict.x = matrex,predict.y=respx)
-
-class(lasso_RRlog)
-
-#-----
-# Pearson for RR -----
-predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("RR","RRn"))]
-
-pearson_pooled <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~RR+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRmice,x) %>% dplyr::select(!c("RRn"))
-    dfcor <- cor.test(formula = cor_formula, data = df)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
+lasso_res_plot <- function(lasso_list, title = "residual plot"){
   
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  pearson_pooled$r[y] <- cor_pooled$qbar
-  pearson_pooled$p_value[y] <- cor_pooled$ubar
+  w <- lasso_list$lasso_raw
+  x <- lasso_list$lasso_pred$pooled
+  j <- order(x)
+  y <- lasso_list$lasso_res$pooled
   
-}
-pearson_pooled <- pearson_pooled[order(pearson_pooled$r,decreasing = T),]
-g <- ggplot(data = filter(pearson_pooled,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=24)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  labs(x = "", y= "r", title = "Pearson correlation coefficient with RR") + ylim(-0.5,1)
-print(g)
-ggsave("8.version_control/r_RR.png",width=10,height = 6)
-
-png("8.version_control/RR_corplot.png")
-RR_corvar <- filter(pearson_pooled,p_value <= 0.05) %>% pull("param")
-RR_cor <- micombine.cor(RRmice,variables = c("RR",RR_corvar), method="pearson") 
-matrix_RR_cor <- attr(RR_cor,"r_matrix")
-colnames(matrix_RR_cor) <- c("DOC","RR", "C:N","C:P")
-rownames(matrix_RR_cor) <- c("DOC","RR", "C:N","C:P")
-matrix_RR_p <-attr(RR_cor,"p_value")
-corrplot::corrplot(corr = matrix_RR_cor,  p.mat = matrix_RR_p, method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,hclust="ward",cl.pos = "n")
-dev.off()
-
-
-# Spearman for RR ----
-
-spearman_pooled <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~RR+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRmice,x)
-    dfcor <- cor.test(formula = cor_formula, data = df, method = "spearman",exact=F)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
+  # plots cross-validation
+  g1 <- ggplot(lasso_list$lasso_cv,aes(x=log(lambda)))+geom_point(aes(y=cvm),col="red")+
+    geom_errorbar(aes(ymin=cvlo,ymax=cvup),col="gray")+
+    geom_vline(xintercept=log(mean(lasso_list$lambda_min)),linetype = "dashed")+
+    geom_label(aes(x=log(mean(lasso_list$lambda_min)),y=max(cvup)/2,label="lambda min",angle=90))+
+    geom_vline(xintercept=log(mean(lasso_list$lambda_1se)), linetype = "dashed")+
+    geom_label(aes(x=log(mean(lasso_list$lambda_1se)),y=max(cvup)/3,label="lambda 1se",angle=90))+
+    labs(x="log(lambda)",y="Mean squared error",title = "Cross-validated lambda")+
+    theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"))
   
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  spearman_pooled$r[y] <- cor_pooled$qbar
-  spearman_pooled$p_value[y] <- cor_pooled$ubar
+  # Fitted vs observed
+  g2 <- qplot(w,x)+
+    labs(x = "Observed values", y = "Fitted values" , title = "Fitted values vs. observations")+
+    annotate("label",x = max(w) - (max(w)-min(w))/6, y = min(x) + (max (x)-min(x))/6, label = paste("MAE",round(mae(w,x),2),sep = " = "), size = 5)+
+    theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"))
   
+  # QQ plot
+  g3 <- ggplot(lasso_list$lasso_res,aes(sample=pooled)) + stat_qq() + stat_qq_line(col = "gray") +
+    labs (x = "Theoretical quantiles", y = "Sample quantiles" , title = "Normal Q-Q plot")+
+    theme_bw(base_size = 15) +  theme(panel.grid = element_line(color="gray95"))   
+  
+  # residual vs predicted
+  
+  z <- loess(y~x)
+  
+  g4 <- qplot(x,y,xlab = "Predicted", ylab = "Residuals") + geom_hline (yintercept = 0,col = "gray") + 
+    geom_smooth(method = "loess", se = F, col = "red")+
+#    geom_line(aes(x=x[j],y = z$fitted[j]),col="red",lwd=1)+
+    labs (x = "Fitted values", title = "Residuals vs fitted")+
+    theme_bw(base_size = 15) + theme(panel.grid = element_line(color="gray95"))
+  
+  grid.arrange(g2,g1,g3,g4,ncol = 2, top = textGrob(title,gp = gpar(fontsize = 25, font = 3),vjust = 0.5))
 }
 
-spearman_pooled <- spearman_pooled[order(spearman_pooled$r,decreasing = T),]
 
-g <- ggplot(data = filter(spearman_pooled,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=reorder(param,order(r,decreasing=T))))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  xlab("")+ ylim(-1,1)
-print(g)
-ggsave("8.version_control/spearman_RR.png",width=8,height = 5)
-
-png("8.version_control/RR_s_corplot.png",width = 600, height = 600)
-covar_RR <- filter(spearman_pooled,p_value <= 0.05) %>% pull("param")
-RR_scor <- micombine.cor(RRmice,variables = c("RR",covar_RR), method="spearman") 
-corrplot::corrplot(corr = attr(RR_scor,"r_matrix"), p.mat = attr(RR_scor,"p_matrix"),sig.level = 0.005, order="AOE",
-                   method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
-dev.off()
-
-
-
-
-# lasso RR  -----
-lasso_RR <- milasso(RRmice,M,"RR","RRn")
-rmse(lakes73$RR,lasso_RR$lasso_pred$pooled)
-write_xlsx(lasso_RR$lasso_coef,"8.version_control/lasso_coef_RR.xlsx")
-
-# Gauss-lasso estimates RR -----
-lm_RR <- with(RRmice,lm(RR~CN))
-lm_RR_pooled <- pool(lm_RR) %>% summary()
-lm_RR_predict <- with(RRmice,predict(lm(RR~CN)))
-RR_predicted <- list.cbind(lm_RR_predict$analyses) %>% rowMeans()
-rmse(lakes73$RR,RR_predicted)
-
-
-# Pearson for BdgT -----
-
-predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("BdgT","RRn"))]
-
-pearson_pooled_bdgT <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~BdgT+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRmice,x)
-    dfcor <- cor.test(formula = cor_formula, data = df)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
+gauss_lasso <- function (mice.object,resp.var,lasso_list){
   
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  pearson_pooled_bdgT$r[y] <- cor_pooled$qbar
-  pearson_pooled_bdgT$p_value[y] <- cor_pooled$ubar
+  title <- paste("Residual plots linear model", resp.var, sep = " ")
   
-}
-
-pearson_pooled_bdgT <- pearson_pooled_bdgT[order(pearson_pooled_bdgT$r,decreasing = T),]
-
-g <- ggplot(data = filter(pearson_pooled_bdgT,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  xlab("")+ ylim(-0.5,1)
-print(g)
-ggsave("8.version_control/pearson_pooled_bdgt.png",width = 8, height = 5)
-
-
-# Spearman for BdgT -----
-
-predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("BdgT","RR"))]
-
-spearman_pooled_bdgT <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~BdgT+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRmice, x)
-    dfcor <- cor.test(formula = cor_formula, data = df,method = "spearman",exact = F)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
+  lm_obs <- mice.object$data[,resp.var]
+  n <- length(lm_obs)
   
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  spearman_pooled_bdgT$r[y] <- cor_pooled$qbar
-  spearman_pooled_bdgT$p_value[y] <- cor_pooled$ubar
+  lasso_param <- lasso_list$lasso_coef$param %>% as.data.frame %>% setNames("lasso_param")
+  covar_index <- which(lasso_list$lasso_coef$number > mice.object$m/2)
+  covar_lm <- lasso_list$lasso_coef$param[covar_index]
+  p <- length(covar_lm)
   
-}
-
-spearman_pooled_bdgT <- spearman_pooled_bdgT[order(spearman_pooled_bdgT$r,decreasing = T),]
-
-g <- ggplot(data = filter(spearman_pooled_bdgT,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=reorder(param,order(r,decreasing=T))))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  xlab("")+ ylim(-1,1)
-print(g)
-ggsave("8.version_control/spearman_bdgt.png",width=8,height = 5)
-
-# mice cor BdgT ----
-png("8.version_control/BdgT_cor.png")
-corvar_BdgT <- filter(pearson_pooled_bdgT,p_value <=0.05) %>% pull("param")
-BdgT_cor <- micombine.cor(RRmice,variables = c("BdgT",corvar_BdgT))
-corrplot::corrplot(corr = attr(BdgT_cor,"r_matrix"),  p.mat = attr(BdgT_cor,"p_value"), method = "number",type = "upper",tl.cex = 1.3, tl.col = "black", number.cex = 1.3,hclust="ward",cl.pos = "n")
-dev.off()
-
-png("8.version_control/BdgT_s_corplot.png",width = 600, height = 600)
-covars_BdgT <- filter(spearman_pooled_bdgT,p_value <= 0.05) %>% pull("param")
-BdgT_scor <- micombine.cor(RRmice,variables = c("BdgT",covars_BdgT), method="spearman") 
-corrplot::corrplot(corr = attr(BdgT_scor,"r_matrix"), p.mat = attr(BdgT_scor,"p_matrix"),sig.level = 0.005, order="AOE",
-                   method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
-dev.off()
-
-
-# lasso BdgT -----
-
-lasso_BdgT <- milasso(RRmice,M,"BdgT","RRn")
-rmse(lakes73$BdgT,lasso_BdgT$lasso_pred$pooled)
-write_xlsx(lasso_BdgT$lasso_coef,"8.version_control/lasso_coef_BdgT.xlsx")
-
-# Gauss-lasso estimates BdgT -----
-lm_BdgT <- with(RRmice,lm(BdgT~Cells+DN+pH+c_O2))
-lm_BdgT_pooled <- pool(lm_BdgT) %>% summary()
-lm_BdgT_predict <- with(RRmice,predict(lm(BdgT~Cells+DN+pH+c_O2)))
-BdgT_predicted <- list.cbind(lm_BdgT_predict$analyses) %>% rowMeans()
-rmse(lakes73$BdgT,BdgT_predicted)
-
-# Pearson for RRn -----
-
-predvar <- names(lakes73u)[-which(names(lakes73u) %in% c("BdgT","RRn"))]
-
-pearson_pooled_RRn <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~RRn+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRmice,x)
-    dfcor <- cor.test(formula = cor_formula, data = df)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
+  lm_fm <- paste(resp.var,paste(covar_lm[-1],collapse = "+"), sep = "~")
   
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  pearson_pooled_RRn$r[y] <- cor_pooled$qbar
-  pearson_pooled_RRn$p_value[y] <- cor_pooled$ubar
+  lm_df <- with(mice.object,lm(as.formula(lm_fm))) %>% pool() %>% summary() %>% as.data.frame() %>% select(c("term","estimate","p.value"))
+  levels(lm_df$term)[which(levels(lm_df$term) == "(Intercept)")] <- "Intercept"
+  fit_print <- merge(lasso_param,lm_df, by.x= "lasso_param",by.y = "term", all.x = T)
+  write_xlsx(fit_print,paste("8.version_control/gauss_lasso_coef_",resp.var,".xlsx",sep=""))
   
-}
-pearson_pooled_RRn <- pearson_pooled_RRn[order(pearson_pooled_RRn$r,decreasing = T),]
-
-g <- ggplot(data = filter(pearson_pooled_RRn,p_value <= 0.04),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.02,0.04, 0.06),labels = c("0","0.02","0.04","0.06"),limits = c(0,0.06), 
-                       guide="legend")+
-  xlab("")+ ylim(-0.5,1)
-print(g)
-ggsave("8.version_control/pearson_RRn.png", width=8,height = 5)
-
-# Spearman for RRn -----
-spearman_pooled_RRn <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~RRn+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRmice,x)
-    dfcor <- cor.test(formula = cor_formula, data = df, method = "spearman", exact = FALSE)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
+  lm_pred_with <- with(mice.object,predict(lm(as.formula(lm_fm))))
+  lm_pred <- list.cbind(lm_pred_with$analyses) %>% rowMeans()
   
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  spearman_pooled_RRn$r[y] <- cor_pooled$qbar
-  spearman_pooled_RRn$p_value[y] <- cor_pooled$ubar
+  lm_res_with <- with(mice.object,residuals(lm(as.formula(lm_fm))))
+  lm_res <- list.cbind(lm_res_with$analyses) %>% rowMeans()
   
-}
+  lm_rstandard_with <- with(mice.object,rstandard(lm(as.formula(lm_fm))))
+  lm_rstandard <- list.cbind(lm_rstandard_with$analyses) %>% rowMeans()
+  
+  lm_lev_with <- with(mice.object,hatvalues(lm(as.formula(lm_fm))))
+  lm_lev <- list.cbind(lm_lev_with$analyses) %>% rowMeans()
+  
+  lm_cook_with <- with(mice.object,cooks.distance(lm(as.formula(lm_fm))))
+  lm_cook <- list.cbind(lm_cook_with$analyses) %>% rowMeans()
+  D <- 4/(n-p-1)
+  outliers <- which(lm_cook > D)
+  names(outliers) <- lakes73$Lake_name[outliers]
+  
+  
+  # fitted vs observed
+  g1 <- qplot(lm_obs,lm_pred)+
+    labs(x = "Observed values", y = "Fitted values" , title = "Fitted values vs. observations")+
+    annotate("label",x = max(lm_obs) - (max(lm_obs)-min(lm_obs))/6, y = min(lm_pred) + (max (lm_pred)-min(lm_obs))/6, label = paste("MAE",round(mae(lm_obs,lm_pred),2),sep = " = "), size = 5)+
+    theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"))
+  
+  #Residuals vs fitted
+  g2 <- qplot(lm_pred,lm_res)+geom_smooth(method = "loess", size = 1, se = F, col = "red")+
+    labs(x="Fitted", y = "Residuals", title = "Residuals vs fitted")+
+    theme_bw(base_size = 15)+theme(panel.grid = element_line(color = "gray95"))
+  
+  # standardised residuals 
+  g3 <- qplot(lm_pred,sqrt(abs(lm_rstandard)))+geom_smooth(method = "loess", size = 1, se = F, col = "red")+
+    labs(x="Fitted", y = "sqrt Standardised residuals", title = "Scale-location")+
+    theme_bw(base_size = 15)+theme(panel.grid = element_line(color = "gray95"))
+  
+  #QQplot
+  g4 <- qplot(sample=lm_res)+stat_qq_line(col = "gray")+
+    labs (x = "Theoretical quantiles", y = "Sample quantiles" , title = "Normal Q-Q plot")+
+    theme_bw(base_size = 15) +  theme(panel.grid = element_line(color="gray95"))  
+  
+  # Residuals vs leverage
+  g5 <- qplot(lm_lev,lm_rstandard)+geom_smooth(method = "loess", size = 1, se = F, col = "red")+
+    labs(x="Leverage", y = "Standardised residuals", title = "Residuals vs leverage")+
+    theme_bw(base_size = 15)+theme(panel.grid = element_line(color = "gray95"))+ 
+    geom_line(aes(x= lm_lev,y = sqrt(D*p*(1-lm_lev)/lm_lev)),col="darkblue",lty = 2)+
+    geom_line(aes(x = lm_lev, y = -sqrt(D*p*(1-lm_lev)/lm_lev)),col="darkblue",lty=2)+
+    geom_label_repel(aes(x=lm_lev[outliers],y=lm_rstandard[outliers]),label=names(outliers),nudge_y = 0.5,nudge_x = 0.1, size = 3.5)+
+    ylim(min(lm_rstandard)-sd(lm_rstandard),max(lm_rstandard)+sd(lm_rstandard))+
+    annotate("label",x = max(lm_lev)*0.8 ,y= min(lm_rstandard),label="Cook's distance (n-p-1)",col="darkblue",size = 3.5)
+  
+  g6 <- qplot(lm_pred,lm_rstandard)+geom_smooth(method = "loess", size = 1, se = F, col = "red")+
+    labs(x="Fitted", y = "Residuals", title = "Residuals vs fitted")+
+    theme_bw(base_size = 15)+theme(panel.grid = element_line(color = "gray95"))
+  g6
+  
+  grid.arrange(g1,g2,g4,g5,ncol = 2, top = textGrob(title,gp = gpar(fontsize = 25, font = 3)))
+}  
 
-spearman_pooled_RRn <- spearman_pooled_RRn[order(spearman_pooled_RRn$r,decreasing = T),]
-g <- ggplot(data = filter(spearman_pooled_RRn,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  xlab("")+ ylim(-1,1)
-print(g)
-ggsave("8.version_control/spearman_RRn.png",width=15,height = 5)
 
-# miceadds corplots RRn -----
-png("8.version_control/RRn_corplot.png")
-RRn_corvar <- filter(pearson_pooled_RRn,p_value <= 0.05) %>% pull("param")
-RRn_cor <- micombine.cor(RRmice,variables = c("RRn",RRn_corvar)) 
-corrplot::corrplot(corr = attr(RRn_cor,"r_matrix"), p.mat = attr(RRn_cor,"p_matrix"), order="hclust",hclust="centroid",
-                   method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
-dev.off()
-
-png("8.version_control/RRn_s_corplot.png",width = 600, height = 600)
-covar_RRn <- filter(spearman_pooled_RRn,p_value <= 0.05) %>% pull("param")
-RRn_scor <- micombine.cor(RRmice,variables = c("RRn","DOC","RR",covar_RRn), method="spearman") 
-corrplot::corrplot(corr = attr(RRn_scor,"r_matrix"), p.mat = attr(RRn_scor,"p_matrix"),sig.level = 0.005, order="hclust",hclust="ward.D2",
-                   method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
-dev.off()
-
-# lasso RRn -----
-lasso_RRn <- milasso(RRmice,M,"RRn",c("RR","DOC"))
-rmse(lakes73u$RRn,lasso_RRn$lasso_pred$pooled)
-write_xlsx(lasso_RRn$lasso_coef,"8.version_control/lasso_coef_RRn.xlsx")
-
-
-# Gauss - lasso estimates RRn-----
-lm_RRn <- with(RRmice,lm(RRn~DN+SUVA+SR))
-lm_RRn_pooled <- pool(lm_RRn) %>% summary()
-lm_RRn_predict <- with(RRmice,predict(lm(RRn~DN+SUVA+SR)))
-RRn_predicted <- list.cbind(lm_RRn_predict$analyses) %>% rowMeans()
-rmse(lakes73u$RRn,RRn_predicted)
 
 #-----
 # MICE on log lakes73 
@@ -774,6 +552,8 @@ dev.off()
 logcovariates <- c("logRR","logRRn","logBdgT","logDOC","logDP","logEC","logFe","logO2","logN2O","logCN","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
 RRlogmice <- select(lakes73log,logcovariates) %>% mice(method = "cart", m = M)
 
+lasso_var <- c("Intercept","logDOC","logDP","logEC","logFe","logO2","logN2O","logCN","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
+
 # correlogram for RRlogmice -----
 png("8.version_control/correlogram.png", width= 1000, height = 1000)
 lakes_cor <- micombine.cor(RRlogmice, method="pearson") 
@@ -785,293 +565,53 @@ corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "n
 dev.off()
 
 
-# lasso log RR -----
+# lasso  -----
 
 lasso_RRlog <- milasso(RRlogmice,M,"logRR",c("logRRn","logBdgT"))
 write_xlsx(lasso_RRlog$lasso_coef,"8.version_control/lasso_coef_logRR.xlsx")
 
-
-# residual plots MAKE FUNCTION -----
-# QQ plot
-x <- rnorm(73,0,1)
-qqplot(y,lasso_RRlog$lasso_res$pooled,xlab = "Normal distribution",ylab = "residuals",main = "Q-Q plot")
-qqnorm(lasso_RRlog$lasso_res$pooled,xlab = "Normal distribution",ylab = "residuals",main = "Q-Q plot")
-qqline(lasso_RRlog$lasso_res$pooled)
-
-# residual vs predicted
-x <- lasso_RRlog$lasso_pred$pooled
-y <- lasso_RRlog$lasso_res$pooled
-z <- loess(y~x)
-j <- order(x)
-plot(x,y,xlab = "Predicted", ylab = "Residuals") + abline(h=0)
-lines(x[j],z$fitted[j],col="red",lwd=2,type="l")
-
-# standardized residuals vs predicted
-w <- loess((y/sd(y))~x)
-plot(x,(y/sd(y)),xlab = "Predicted",ylab = "Standardised residuals") + abline(h=0)
-lines(x[j],w$fitted[j],col="red",lwd = 2, type = "l")
-
-# cumulative distribution
-plot(ecdf(residuals))
-
-# lambda selection???
-
-
-
-plot(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)+abline(a=0,b=1)
-rmse(lakes73log$logRR,lasso_RRlog$lasso_pred$pooled)
-
-# linear model log RR ----- 
-lm_RRlog <- with(RRlogmice,lm(logRR~logCN+Cells+c_CO2+SARuv+logFe+logDP+SUVA))
-lm_RRlog_pooled <- pool(lm_RRlog) %>% summary()
-
-lm_RRlog_predict <- with(RRlogmice,predict(lm(logRR~logCN+Cells+c_CO2+SARuv+logFe+logDP+SUVA)))
-RRlog_predicted <- list.cbind(lm_RRlog_predict$analyses) %>% rowMeans()
-
-rmse(lakes73log$logRR,RRlog_predicted)
-
-
-
-
-
-# pearson log RR -----
-predvar <- names(lakes73log)[-which(names(lakes73log) %in% c("logRR","logRRn"))]
-pearson_pooled_RRlog <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~logRR+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRlogmice,x) %>% dplyr::select(!c("logRRn"))
-    dfcor <- cor.test(formula = cor_formula, data = df)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
-  
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  pearson_pooled_RRlog$r[y] <- cor_pooled$qbar
-  pearson_pooled_RRlog$p_value[y] <- cor_pooled$ubar
-  
-}
-pearson_pooled_RRlog <- pearson_pooled_RRlog[order(pearson_pooled_RRlog$r,decreasing = T),]
-g <- ggplot(data = filter(pearson_pooled_RRlog,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=24)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  labs(x = "", y= "r", title = "Pearson correlation coefficient with RR log") + ylim(-0.5,1)
-print(g)
-ggsave("8.version_control/pearson_cor_RRlog.png",width= 8,height = 5)
-
-
-png("8.version_control/RRlog_cor.png",width=700,height = 700)
-covar_RR <- filter(pearson_pooled_RRlog,p_value <= 0.05) %>% pull("param")
-RR_cor <- micombine.cor(RRlogmice,variables = c("logRR",covar_RR), method="pearson") 
-matrix_RR_cor <- attr(RR_cor,"r_matrix")
-colnames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
-rownames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
-matrix_RR_p <-attr(RR_cor,"p_value")
-corrplot::corrplot(corr = matrix_RR_cor,  p.mat = matrix_RR_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
-dev.off()
-
-# Spearman log RR -----
-spearman_pooled_logRR <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~logRR+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRlogmice,x)
-    dfcor <- cor.test(formula = cor_formula, data = df, method = "spearman",exact=F)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
-  
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  spearman_pooled_logRR$r[y] <- cor_pooled$qbar
-  spearman_pooled_logRR$p_value[y] <- cor_pooled$ubar
-  
-}
-
-spearman_pooled_logRR <- spearman_pooled_logRR[order(spearman_pooled_logRR$r,decreasing = T),]
-
-g <- ggplot(data = filter(spearman_pooled_logRR,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=reorder(param,order(r,decreasing=T))))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  xlab("")+ ylim(-1,1)
-print(g)
-ggsave("8.version_control/spearman_RRlog.png",width=8,height = 5)
-
-png("8.version_control/logRR_scorplot.png",width = 600, height = 600)
-covar_RR <- filter(spearman_pooled_logRR,p_value <= 0.05) %>% pull("param")
-RR_scor <- micombine.cor(RRlogmice,variables = c("logRR",covar_RR), method="spearman") 
-corrplot::corrplot(corr = attr(RR_scor,"r_matrix"), p.mat = attr(RR_scor,"p_matrix"),sig.level = 0.005, order="AOE",
-                   method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,cl.pos = "n")
-dev.off()
-
-# lasso log BdgT ----
 lasso_BdgTlog <- milasso(RRlogmice,M,"logBdgT",c("logRR","logRRn"))
-?write_xlsx(lasso_BdgTlog$lasso_coef, "8.version_control/lasso_logBdgT.xlsx")
+write_xlsx(lasso_BdgTlog$lasso_coef, "8.version_control/lasso_logBdgT.xlsx")
 
-plot(lakes73log$BdgT,lasso_BdgTlog$lasso_pred$pooled)+abline(a=0,b=1)
-rmse(lakes73log$logBdgT,lasso_BdgTlog$lasso_pred$pooled)
-
-lm_BdgTlog <- with(RRlogmice,lm(logBdgT~logDOC+c_O2+pH+logAlkalinity+logDN+Cells+SARuv+logFe+logCO2))
-lm_BdgTlog_pooled <- pool(lm_BdgTlog) %>% summary()
-
-lm_BdgTlog_predict <- with(RRlogmice,predict(lm(logBdgT~logDOC+c_O2+pH+logAlkalinity+logDN+Cells+SARuv+logFe+logCO2)))
-BdgTlog_predicted <- list.cbind(lm_BdgTlog_predict$analyses) %>% rowMeans()
-
-rmse(lakes73log$logBdgT,BdgTlog_predicted)
-
-
-# pearson log BdgT -----
-predvar <- names(lakes73log)[-which(names(lakes73log) %in% c("logBdgT","logRRn"))]
-pearson_pooled_BdgTlog <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~logBdgT+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRlogmice,x) 
-    dfcor <- cor.test(formula = cor_formula, data = df)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
-  
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  pearson_pooled_BdgTlog$r[y] <- cor_pooled$qbar
-  pearson_pooled_BdgTlog$p_value[y] <- cor_pooled$ubar
-  
-}
-pearson_pooled_BdgTlog <- pearson_pooled_BdgTlog[order(pearson_pooled_BdgTlog$r,decreasing = T),]
-g <- ggplot(data = filter(pearson_pooled_BdgTlog,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=24)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  labs(x = "", y= "r", title = "Pearson correlation coefficient with BdgT log") + ylim(-0.5,1)
-print(g)
-ggsave("8.version_control/pearson_cor_BdgTlog.png",width= 8,height = 5)
-
-
-png("8.version_control/BdgTlog_cor.png",width=700,height = 700)
-covar_BdgT <- filter(pearson_pooled_BdgTlog,p_value <= 0.05) %>% pull("param")
-BdgT_cor <- micombine.cor(RRlogmice,variables = c("logBdgT",covar_BdgT), method="pearson")
-matrix_BdgT_cor <- attr(BdgT_cor,"r_matrix")
-colnames(matrix_BdgT_cor) <- c("log(DN)","log(Alkalinity)","log(SO4)","log(K)","log(Ca)","log(Mg)","log(O2)","log(BdgT)","pH","c_O2")
-rownames(matrix_BdgT_cor) <- c("log(DN)","log(Alkalinity)","log(SO4)","log(K)","log(Ca)","log(Mg)","log(O2)","log(BdgT)","pH","c_O2")
-matrix_BdgT_p <-attr(BdgT_cor,"p_value")
-corrplot::corrplot(corr = matrix_BdgT_cor,  p.mat = matrix_BdgT_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n")
-dev.off()
-
-# Spearman log BdgT -----
-spearman_pooled_logBdgT <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~logBdgT+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRlogmice,x)
-    dfcor <- cor.test(formula = cor_formula, data = df, method = "spearman",exact=F)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
-  
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  spearman_pooled_logBdgT$r[y] <- cor_pooled$qbar
-  spearman_pooled_logBdgT$p_value[y] <- cor_pooled$ubar
-  
-}
-
-spearman_pooled_logBdgT <- spearman_pooled_logBdgT[order(spearman_pooled_logBdgT$r,decreasing = T),]
-
-g <- ggplot(data = filter(spearman_pooled_logBdgT,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=reorder(param,order(r,decreasing=T))))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=28)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  xlab("")+ ylim(-1,1)
-print(g)
-ggsave("8.version_control/spearman_BdgTlog.png",width=8,height = 5)
-
-png("8.version_control/logBdgT_scorplot.png",width = 600, height = 600)
-covar_BdgT <- filter(spearman_pooled_logBdgT,p_value <= 0.05)%>% filter(abs(r) > 0.3) %>% pull("param")
-BdgT_scor <- micombine.cor(RRlogmice,variables = c("logBdgT",covar_BdgT), method="spearman") 
-corrplot::corrplot(corr = attr(BdgT_scor,"r_matrix"), p.mat = attr(BdgT_scor,"p_matrix"),sig.level = 0.005, order="AOE",
-                   method = "number",type = "upper",tl.cex = 2, tl.col = "black", number.cex = 2,cl.pos = "n")
-dev.off()
-
-# lasso log RRn -----
-lasso_RRnlog <- milasso(RRlogmice,M,"logRRn","logRR")
+lasso_RRnlog <- milasso(RRlogmice,M,"logRRn",c("logRR","logBdgT"))
 write_xlsx(lasso_RRnlog$lasso_coef,"8.version_control/lasso_coef_logRRn.xlsx")
 
-# linear regression log RRn -----
-plot(lakes73log$logRRn,lasso_RRnlog$lasso_pred$pooled)+abline(a=0,b=1)
-rmse(lakes73log$logBdgT,lasso_RRnlog$lasso_pred$pooled)
+pdf("8.version_control/lasso_res_plot.pdf",height = 10, width = 15)
+lasso_res_plot(lasso_RRlog, title = "Residual plots lasso regression RR")
+lasso_res_plot(lasso_BdgTlog, title = "Residual plots lasso regression BdgT")
+lasso_res_plot(lasso_RRnlog, title = "Residual plots lasso regression RRn")
+dev.off()
 
-lm_RRnlog <- with(RRlogmice,lm(logRRn~SR+c_O2+pH+c_CO2+SARuv+logMg+logFe+logNa+logCH4+logDP+logDN+SUVA))
-lm_RRnlog_pooled <- pool(lm_RRnlog) %>% summary()
+# Linear model  ----- 
 
-lm_RRnlog_predict <- with(RRlogmice,predict(lm(logRRn~SR+c_O2+pH+c_CO2+SARuv+logMg+logFe+logNa+logCH4+logDP+logDN+SUVA)))
-RRnlog_predicted <- list.cbind(lm_RRnlog_predict$analyses) %>% rowMeans()
+pdf("8.version_control/gauss_lasso.pdf",height = 10,width = 15)
+gauss_lasso(RRlogmice,"logRR",lasso_RRlog)
+gauss_lasso(RRlogmice,"logBdgT",lasso_BdgTlog)
+gauss_lasso(RRlogmice,"logRRn",lasso_RRnlog)
+ dev.off()
 
-plot(lakes73log$logRRn,RRnlog_predicted)+abline(a=0,b=1)
-rmse(lakes73log$logRRn,RRnlog_predicted)
+# removing one outlier -----
+set.seed(5)
+RRlogmice2 <- select(lakes73log[-outliers,],logcovariates) %>%  mice(method = "cart", m = M)
 
-# Pearson log RRn -----
-predvar <- names(lakes73log)[-which(names(lakes73log) == "logRRn")]
-pearson_pooled_RRnlog <- predvar %>% as.data.frame() %>% setNames("param")
-estimates <- c()
-p_values <- c()
-for(y in 1:length(predvar)){
-  cor_formula <- as.formula(paste("~logRRn+",predvar[y],sep=""))
-  for(x in 1:M){
-    df <- complete(RRlogmice,x)
-    dfcor <- cor.test(formula = cor_formula, data = df)
-    estimates[x] <- dfcor$estimate[[1]]
-    p_values[x] <- dfcor$p.value[[1]]
-  }
-  
-  cor_pooled <- pool.scalar(estimates,p_values,n=73,k=1) 
-  pearson_pooled_RRnlog$r[y] <- cor_pooled$qbar
-  pearson_pooled_RRnlog$p_value[y] <- cor_pooled$ubar
-  
-}
-pearson_pooled_RRnlog <- pearson_pooled_RRnlog[order(pearson_pooled_RRnlog$r,decreasing = T),]
-g <- ggplot(data = filter(pearson_pooled_RRnlog,p_value <= 0.05),aes(x=reorder(param,order(r,decreasing=T)),y=r,label=param))+
-  geom_col(aes(fill=p_value))+ 
-  geom_text(angle=90,hjust=0,nudge_y = 0.01,size=7)+
-  theme_bw(base_size=24)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),panel.grid.minor = element_blank())+
-  scale_fill_gradientn(colors = c("skyblue","dodgerblue4","firebrick"),
-                       breaks = c(0,0.01,0.025, 0.05),labels = c("0","0.01","0.025","0.05"),limits = c(0,0.05), 
-                       guide="legend")+
-  labs(x = "", y= "r", title = "Pearson correlation coefficient with RR log") + ylim(-1,1)
-print(g)
-ggsave("8.version_control/pearson_RRnlog.png",width= 8,height = 5)
+lasso_RRlog2 <- milasso(RRlogmice2,M,"logRR",c("logRRn","logBdgT"))
+write_xlsx(lasso_RRlog2$lasso_coef,"8.version_control/lasso_coef_logRR2.xlsx")
+
+lasso_BdgTlog2 <- milasso(RRlogmice2,M,"logBdgT",c("logRR","logRRn"))
+write_xlsx(lasso_BdgTlog2$lasso_coef, "8.version_control/lasso_logBdgT2.xlsx")
+
+lasso_RRnlog2 <- milasso(RRlogmice2,M,"logRRn","logRR")
+write_xlsx(lasso_RRnlog2$lasso_coef,"8.version_control/lasso_coef_logRRn2.xlsx")
+
+pdf("8.version_control/lasso_res_plot2.pdf",height = 10, width = 15)
+lasso_res_plot(lasso_RRlog2, title = "Residual plots lasso regression RR")
+lasso_res_plot(lasso_BdgTlog2, title = "Residual plots lasso regression BdgT")
+lasso_res_plot(lasso_RRnlog2, title = "Residual plots lasso regression RRn")
+dev.off()
 
 
-png("8.version_control/RRnlog_cor.png",width=700,height = 700)
-covar_RRn <- filter(pearson_pooled_RRnlog,p_value <= 0.05) %>% filter(abs(r) > 0.4) %>% pull("param")
-RRn_cor <- micombine.cor(RRlogmice,variables = c("logRRn",covar_RRn), method="pearson") 
-matrix_RRn_cor <- attr(RRn_cor,"r_matrix")
-colnames(matrix_RRn_cor) <- c("log(DOC)","log(DN)","log(EC)","log(Cl)","log(B)","log(Na)","log(K)","log(Mg)","log(CH4)","log(RR)", "log(RRn)","SUVA","SR")
-rownames(matrix_RRn_cor) <- c("log(DOC)","log(DN)","log(EC)","log(Cl)","log(B)","log(Na)","log(K)","log(Mg)","log(CH4)","log(RR)", "log(RRn)","SUVA","SR")
-matrix_RRn_p <-attr(RRn_cor,"p_value")
-corrplot::corrplot(corr = matrix_RRn_cor,  p.mat = matrix_RRn_p, method = "number",type = "upper",tl.cex = 1.3, tl.col = "black", number.cex = 1.3,hclust="ward",cl.pos = "n")
+pdf("8.version_control/gauss_lasso2.pdf",height = 10,width = 15)
+gauss_lasso(RRlogmice2,"logRR",lasso_RRlog2)
+gauss_lasso(RRlogmice2,"logBdgT",lasso_BdgTlog2)
+gauss_lasso(RRlogmice2,"logRRn",lasso_RRnlog2)
 dev.off()

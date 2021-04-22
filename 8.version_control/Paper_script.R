@@ -435,6 +435,25 @@ lasso_res_plot <- function(lasso_list, title = "residual plot"){
   grid.arrange(g2,g1,g3,g4,ncol = 2, top = textGrob(title,gp = gpar(fontsize = 25, font = 3),vjust = 0.5))
 }
 
+lasso_simple_plot <- function(lasso_list, title = ""){
+  
+  w <- lasso_list$lasso_raw
+  x <- lasso_list$lasso_pred$pooled
+  j <- order(x)
+  y <- lasso_list$lasso_res$pooled
+
+  # Fitted vs observed
+  g1 <- qplot(w,x,col=y)+
+    labs(x = "Observed values", y = "Fitted values" , title = paste("Fitted values vs. observations",title, sep = " "),col="Residuals")+
+    geom_abline(intercept = 0, slope = 1, col = "gray")+
+    scale_color_viridis_c(direction = -1, end = 1 ,begin = 0)+
+    annotate("label",x = max(w) - (max(w)-min(w))/6, y = min(x) + (max (x)-min(x))/6, label = paste("MAE",round(mae(w,x),2),sep = " = "), size = 5)+
+    theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"))
+  plot(g1)
+
+}
+
+
 
 gauss_lasso <- function (mice.object,resp.var,lasso_list){
   
@@ -452,7 +471,8 @@ gauss_lasso <- function (mice.object,resp.var,lasso_list){
   
   lm_df <- with(mice.object,lm(as.formula(lm_fm))) %>% pool() %>% summary() %>% as.data.frame() %>% select(c("term","estimate","p.value"))
   levels(lm_df$term)[which(levels(lm_df$term) == "(Intercept)")] <- "Intercept"
-  fit_print <- merge(lasso_param,lm_df, by.x= "lasso_param",by.y = "term", all.x = T)
+  fit_print <- merge(lasso_param,lm_df, by.x= "lasso_param",by.y = "term", all.x = T) %>% mutate(Response = resp.var)
+  assign(paste("lm_fit_",resp.var,sep=""), fit_print,envir = .GlobalEnv)
   write_xlsx(fit_print,paste("8.version_control/gauss_lasso_coef_",resp.var,".xlsx",sep=""))
   
   lm_pred_with <- with(mice.object,predict(lm(as.formula(lm_fm))))
@@ -508,9 +528,17 @@ gauss_lasso <- function (mice.object,resp.var,lasso_list){
   g6 <- qplot(lm_pred,lm_rstandard)+geom_smooth(method = "loess", size = 1, se = F, col = "red")+
     labs(x="Fitted", y = "Residuals", title = "Residuals vs fitted")+
     theme_bw(base_size = 15)+theme(panel.grid = element_line(color = "gray95"))
-  g6
   
   grid.arrange(g1,g2,g4,g5,ncol = 2, top = textGrob(title,gp = gpar(fontsize = 25, font = 3)))
+  
+  g7 <- qplot(lm_obs,lm_pred,col=lm_rstandard)+
+    labs(x = "Observed values", y = "Fitted values" , title = paste("Fitted values vs. observations",resp.var,sep = " "),col="Standardised Residuals")+
+    geom_abline(intercept = 0, slope = 1, col = "gray")+
+    scale_color_viridis_c(direction = -1, end = 1 ,begin = 0)+
+    annotate("label",x = max(w) - (max(w)-min(w))/6, y = min(x) + (max (x)-min(x))/6, label = paste("MAE",round(mae(w,x),2),sep = " = "), size = 5)+
+    theme_bw(base_size=20)+ theme(panel.grid = element_line(color="gray95"))
+  plot(g7)
+  
 }  
 
 
@@ -549,7 +577,7 @@ corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "n
 dev.off()
 
 # RRlogmice -----
-logcovariates <- c("logRR","logRRn","logBdgT","logDOC","logDP","logEC","logFe","logO2","logN2O","logCN","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
+logcovariates <- c("logRR","logRRn","logBdgT","logDOC","logCN","logDP","logEC","logFe","pH","Cells","SUVA","SARuv","logO2","logN2O","p_O2","p_CO2","c_CO2","p_CH4")
 RRlogmice <- select(lakes73log,logcovariates) %>% mice(method = "cart", m = M)
 
 lasso_var <- c("Intercept","logDOC","logDP","logEC","logFe","logO2","logN2O","logCN","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
@@ -558,10 +586,10 @@ lasso_var <- c("Intercept","logDOC","logDP","logEC","logFe","logO2","logN2O","lo
 png("8.version_control/correlogram.png", width= 1000, height = 1000)
 lakes_cor <- micombine.cor(RRlogmice, method="pearson") 
 matrix_lakes_cor <- attr(lakes_cor,"r_matrix")
-colnames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(DP)","log(DC)","log(Fe)","log(O2)","log(N2O)","log(C:N)","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
-rownames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(DP)","log(DC)","log(Fe)","log(O2)","log(N2O)","log(C:N)","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
+colnames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(C:N)","log(DP)","log(EC)","log(Fe)","pH","Cells","SUVA","SARuv","log(O2)","log(N2O)","p_O2","p_CO2","c_CO2","p_CH4")
+rownames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(C:N)","log(DP)","log(EC)","log(Fe)","pH","Cells","SUVA","SARuv","log(O2)","log(N2O)","p_O2","p_CO2","c_CO2","p_CH4")
 matrix_lakes_p <-attr(lakes_cor,"p_value")
-corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="ward",cl.pos = "n", sig.level = 0.99)
+corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="single",cl.pos = "n", sig.level = 0.99)
 dev.off()
 
 
@@ -576,11 +604,41 @@ write_xlsx(lasso_BdgTlog$lasso_coef, "8.version_control/lasso_logBdgT.xlsx")
 lasso_RRnlog <- milasso(RRlogmice,M,"logRRn",c("logRR","logBdgT"))
 write_xlsx(lasso_RRnlog$lasso_coef,"8.version_control/lasso_coef_logRRn.xlsx")
 
+df1 <- select(lasso_RRlog$lasso_coef,c("param","pooled","number")) %>% mutate(Response = "logRR")
+df2 <- select(lasso_BdgTlog$lasso_coef,c("param","pooled","number")) %>% mutate(Response = "logBdgT")
+df3 <- select(lasso_RRnlog$lasso_coef,c("param","pooled","number")) %>% mutate(Response = "logRRn")
+long_lasso <- rbind(df1,df2,df3) %>% filter(number > M/2) %>% filter(param != "Intercept")
+
+
+# plots lasso on pdf -----
 pdf("8.version_control/lasso_res_plot.pdf",height = 10, width = 15)
 lasso_res_plot(lasso_RRlog, title = "Residual plots lasso regression RR")
 lasso_res_plot(lasso_BdgTlog, title = "Residual plots lasso regression BdgT")
 lasso_res_plot(lasso_RRnlog, title = "Residual plots lasso regression RRn")
+
 dev.off()
+
+pdf("8.version_control/lasso_model_plot.pdf",height = 8,width = 10)
+
+lasso_simple_plot(lasso_RRlog,title = "log(RR)")
+lasso_simple_plot(lasso_RRnlog,title = "log(RRn)")
+lasso_simple_plot(lasso_BdgTlog, title = "log(BdgT)")
+
+ggplot(long_lasso)+geom_col(aes(x=param,y=pooled,fill=Response))+facet_grid(rows = vars(Response),scales = "free_y")+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA))+
+  scale_fill_viridis_d(end = 0.8)
+
+ggplot(long_lasso)+geom_col(aes(x=param,y=pooled,fill=Response))+facet_grid(rows = vars(Response))+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA))+
+  scale_fill_viridis_d(end = 0.8)
+
+dev.off()
+
+  
 
 # Linear model  ----- 
 
@@ -588,7 +646,25 @@ pdf("8.version_control/gauss_lasso.pdf",height = 10,width = 15)
 gauss_lasso(RRlogmice,"logRR",lasso_RRlog)
 gauss_lasso(RRlogmice,"logBdgT",lasso_BdgTlog)
 gauss_lasso(RRlogmice,"logRRn",lasso_RRnlog)
- dev.off()
+
+dev.off()
+
+pdf("8.version_control/gauss_lasso_model.pdf",height = 8, width = 10)
+long_lm <- rbind(lm_fit_logRR,lm_fit_logRRn,lm_fit_logBdgT) %>% filter(lasso_param != "Intercept") %>% filter(p.value < 0.05)
+
+ggplot(long_lm)+geom_col(aes(x=lasso_param,y=estimate,fill=Response))+facet_grid(rows = vars(Response),scales = "free_y")+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA))+
+  scale_fill_viridis_d(end = 0.8)
+
+ggplot(long_lm)+geom_col(aes(x=lasso_param,y=estimate,fill=Response))+facet_grid(rows = vars(Response))+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA))+
+  scale_fill_viridis_d(end = 0.8)
+
+dev.off()
 
 # removing one outlier -----
 set.seed(5)
@@ -607,6 +683,7 @@ pdf("8.version_control/lasso_res_plot2.pdf",height = 10, width = 15)
 lasso_res_plot(lasso_RRlog2, title = "Residual plots lasso regression RR")
 lasso_res_plot(lasso_BdgTlog2, title = "Residual plots lasso regression BdgT")
 lasso_res_plot(lasso_RRnlog2, title = "Residual plots lasso regression RRn")
+
 dev.off()
 
 

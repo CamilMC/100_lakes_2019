@@ -41,6 +41,7 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 
 lakes73 <- read.csv("8.version_control/rr100lakes.csv")
 lakes73$SARvis[which(lakes73$SARvis == "Inf")] <- "NA"
+lakes73$Mg[which(lakes73$Mg < 0)] <- "NA"
 lakes73num <- lakes73 %>% sapply(as.numeric) %>% as.data.frame() %>% select_if(not_all_na)
 
 #-----
@@ -62,45 +63,29 @@ ggplot(lakes73)+geom_point(aes(x = RR,y = OD))
 boxplot(lakes73$RR)
 boxplot(lakes73$BdgT)
 
-g <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=RR))
-outliers <- ggplot_build(g)[["data"]][[1]][["outliers"]] %>% as.data.frame()
-outliers_ID <-  filter(lakes73, lakes73$RR %in% outliers[[1]]) %>% dplyr::select(Lake_name)
-outliers$Lake_ID <- outliers_ID$Lake_name
-names(outliers) <- c("RR","Lake_name")
-g <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=RR),outlier.size = 3, width = 1.5)+theme_light(base_size = 20)+xlab("")+ylab("RR (umol/h)")+
-  geom_text_repel(data=outliers,aes(x="",y=outliers[,"RR"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
-print(g)
-ggsave("boxplot_RR.png",width=4,height=6)
+boxplot_bdg <- function(data,resp.var){
+  g <- ggplot()+geom_boxplot(data = data, aes(x = "", y = data[,resp.var]))
+  outliers <- ggplot_build(g)[["data"]][[1]][["outliers"]] %>% as.data.frame()
+  outliers_ID <- filter(data, data[,resp.var] %in% outliers[[1]]) %>% dplyr::select(Lake_name)
+  outliers$Lake_ID <- outliers_ID$Lake_name
+  names(outliers) <- c(resp.var,"Lake_name")
+  g <- ggplot()+geom_boxplot(data=data,aes(x="",y=data[,resp.var]),outlier.size = 3, width = 1.5)+theme_light(base_size = 20) + xlab("")+ylab(resp.var)+
+    geom_text_repel(data = outliers, aes(x="",y=outliers[,resp.var],label = Lake_name),position = position_dodge(width = 2), size = 6, col = "steelblue4", segment.size = 1)
+  print(g)
+}
 
-h <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=BdgT))
-outliers <- ggplot_build(h)[["data"]][[1]][["outliers"]] %>% as.data.frame()
-outliers_ID <-  filter(lakes73, lakes73$BdgT %in% outliers[[1]]) %>% dplyr::select(Lake_name)
-outliers$Lake_ID <- outliers_ID$Lake_name
-names(outliers) <- c("BdgT","Lake_name")
-h <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=BdgT),outlier.size = 3,width=1.5)+theme_light(base_size = 20)+xlab("")+ylab("BdgT (h)")+
-  geom_text_repel(data=outliers,aes(x="",y=outliers[,"BdgT"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
-print(h)
-ggsave("boxplot_BdgT.png",width=4,height=6)
-       
-i <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(RR)))
-outliers <- ggplot_build(i)[["data"]][[1]][["outliers"]] %>% as.data.frame()
-outliers_ID <-  filter(lakes73, log(lakes73$RR) %in% outliers[[1]]) %>% dplyr::select(Lake_name)
-outliers$Lake_ID <- outliers_ID$Lake_name
-names(outliers) <- c("RR","Lake_name")
-i <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(RR)),outlier.size = 3, width = 1.5)+theme_light(base_size = 20)+xlab("")+ylab("log(RR)")+
-  geom_text_repel(data=outliers,aes(x="",y=outliers[,"RR"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
-print(i)
-ggsave("boxplot_logRR.png",width=4,height=6)
+g <- boxplot_bdg(lakes73,"RR")
+h <- boxplot_bdg(lakes73,"BdgT")
 
-j <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(BdgT)))
-outliers <- ggplot_build(j)[["data"]][[1]][["outliers"]] %>% as.data.frame()
-outliers_ID <-  filter(lakes73, log(lakes73$BdgT) %in% outliers[[1]]) %>% dplyr::select(Lake_name)
-outliers$Lake_ID <- outliers_ID$Lake_name
-names(outliers) <- c("BdgT","Lake_name")
-j <- ggplot()+geom_boxplot(data=lakes73,aes(x="",y=log(BdgT)),outlier.size = 3, width = 1.5)+theme_light(base_size = 20)+xlab("")+ylab("log(BdgT)")+
-  geom_text_repel(data=outliers,aes(x="",y=outliers[,"BdgT"],label=Lake_name),position = position_dodge(width=2),size = 6, col = "steelblue4",segment.size = 1)
-print(j)
-ggsave("boxplot_logBdgT.png",width=4,height=6)
+lakes73log$Lake_name <- lakes73$Lake_name
+i <- boxplot_bdg(lakes73log,"logRR")
+j <- boxplot_bdg(lakes73log,"logBdgT")
+lakes73log$Lake_name <- NULL
+
+png("8.version_control/boxplot_RR.png",type = "cairo", units = "in", width = 20, height = 10,res = 100)
+grid.arrange(g,h,i,j, ncol = 4)
+dev.off()
+
 
 
 boxplots <- function(df,coef_out){
@@ -309,9 +294,12 @@ ggsave("8.version_control/map_DOC.jpeg",width=8,height=6)
 #-----
 # create multiple imputation datasets to fill NA -----
 param2remove <- c("auc","width","OD","Lake_ID","NVE_number","NIVA_date","X","Long","Lat","Altitude","CBA_week","tmax","tmax_h","ox_initial","F","pH_bio","EC_bio","NO2","NO3","DNA","p_N2","p_O2","c_O2","p_CO2","c_CO2","p_CH4","p_N2O","d18O","d2H","Tso","a254","a400","a410","a600","a275","a295","s_275_295","a350","a400","s_350_400","lag_bdg","H","NP","CNP","dist_bact","PO4")
-param2keep <- c("RR","BdgT","T","pH","EC","Cells","DOC","DN","DP","CN","CP","Alkalinity","Cl","B","SO4","Na","K","Ca","Mg","Fe","Al","SUVA","SARuv","SARvis","SR","sVISa","O2","CO2","CH4","N2O","p_O2","c_O2","p_CO2","c_CO2","p_CH4")
+param2keep <- c("Lake_name","RR","BdgT","T","pH","EC","Cells","DOC","DN","DP","CN","CP","Alkalinity","Cl","B","SO4","Na","K","Ca","Mg","Fe","Al","SUVA","SARuv","SARvis","SR","sVISa","O2","CO2","CH4","N2O")
 lakes73u <- lakes73num %>% dplyr::select(which(names(lakes73num)%in% param2keep))
 lakes73u$RRn <- lakes73u$RR/lakes73u$DOC
+lakes73u$Lake_name <- lakes73$Lake_name
+sequence <- c("Lake_name","RR","RRn","BdgT","DOC","SUVA","sVISa","SARuv","SARvis","SR","pH","Alkalinity","T","EC","Ca","Mg","Na","K","Fe","Al","SO4","Cl","B","DN","DP","CN","CP","O2","CO2","N2O","CH4","Cells")
+lakes73u <- select(lakes73u,sequence)
 write_xlsx(lakes73u,"8.version_control/lakes73u.xlsx")
 
 M <- 50
@@ -338,7 +326,7 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
   
   for (z in 1:M){
     lasso_coef %>% tibble::add_column(z=NA)
-    data <- complete(mice.object,z) %>% dplyr::select(!excluded.var)
+    data <- complete(mice.object,z) %>% dplyr::select(!all_of(excluded.var))
     set.seed(5)
     lasso.formula <- as.formula(paste(resp.var,"~.",sep=""))
     fit <- cv.glmnet(formula = lasso.formula,data = data)
@@ -349,7 +337,7 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
       lasso_coef[coef_fit[w,1],z+1] <- coef_fit[w,3]
     }
     
-    newmat <- complete(mice.object,z) %>% dplyr::select(!c(resp.var,excluded.var)) 
+    newmat <- complete(mice.object,z) %>% dplyr::select(!c(all_of(resp.var),all_of(excluded.var))) 
     lasso_pred[,z] <- predict(fit,newmat[1:n,],s="lambda.min")
     lasso_res[,z] <- data[,resp.var] - lasso_pred[,z]
     lasso_lambda[1:l,z] <- fit$lambda
@@ -448,7 +436,7 @@ lasso_simple_plot <- function(lasso_list, title = ""){
   y <- lasso_list$lasso_res$pooled
 
   # Fitted vs observed
-  g1 <- qplot(w,x,col=y)+
+  g1 <- qplot(w,x,col=y,size = 3)+
     labs(x = "Observed values", y = "Fitted values" , title = paste("Fitted values vs. observations",title, sep = " "),col="Residuals")+
     geom_abline(intercept = 0, slope = 1, col = "gray")+
     scale_color_gradientn(colours = viridis(5, direction = -1, end = 1 ,begin = 0.1), breaks = c(-0.5, 0, 0.5, 1), labels =c("-0.5", "0", "0.5", "1") )+
@@ -534,7 +522,7 @@ gauss_lasso <- function (mice.object,resp.var,lasso_list){
   
   grid.arrange(g1,g2,g4,g5,ncol = 2, top = textGrob(title,gp = gpar(fontsize = 25, font = 3)))
   
-  g7 <- qplot(lm_obs,lm_pred,col=lm_rstandard)+
+  g7 <- qplot(lm_obs,lm_pred,col=lm_rstandard,size = 3)+
     labs(x = "Observed values", y = "Fitted values" , title = paste("Linear regression", resp.var, sep = " "),col="Standardised Residuals")+
     geom_abline(intercept = 0, slope = 1, col = "gray")+
     scale_color_gradientn(colours = viridis(5, direction = -1, end = 1 ,begin = 0.1), breaks = c(-3,-2,-1,0,1,2,3), labels =c("-3","-2","-1","0","1","2","3"))+
@@ -547,12 +535,15 @@ gauss_lasso <- function (mice.object,resp.var,lasso_list){
 # MICE on log lakes73 
 #----- 
 # mice on lakes73log -----
-lakes73log <- lakes73u %>% select(!which(names(lakes73u) %in% c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4"))) %>% log10()
+lakes73log <- lakes73u %>% select(!which(names(lakes73u) %in% c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa"))) %>% log10()
 names(lakes73log) <- paste("log",names(lakes73log),sep="")
+sequence <- c("logRR","logRRn","logBdgT","logDOC","SUVA","sVISa","SARuv","SR","pH","logAlkalinity","logT","logEC","logCa","logMg","logNa","logK","logFe","logAl","logSO4","logCl","logB","logDN","logDP","logCN","logCP","logO2","logCO2","logN2O","logCH4","Cells")
 
 
-lakes73log <- cbind(lakes73log,select(lakes73u,c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa","p_O2","c_O2","p_CO2","c_CO2","p_CH4")))
+lakes73log <- cbind(lakes73log,select(lakes73u,c("pH","Cells","SUVA","SARuv","SARvis","SR","sVISa")))
 lakes73log[lakes73log == "-Inf"] <- NA
+lakes73log <- select(lakes73log,sequence)
+
  
 pdf("8.version_control/lakes73log_distribution.pdf")
 lakes73log$Lake_ID <- lakes73$Lake_ID
@@ -569,37 +560,49 @@ indvarlogmice <- select(lakes73log,!c("logRR","logRRn","logBdgT")) %>% mice(meth
 
 pdf("8.version_control/big_cor.pdf", width = 15, height = 15)
 
+set.seed(5)
 lakes_cor <- micombine.cor(indvarlogmice, method="pearson",conf.level = 0.95) 
 matrix_lakes_cor <- attr(lakes_cor,"r_matrix")
-#colnames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
-#rownames(matrix_RR_cor) <- c("log(DN)","log(DP)", "log(SO4)","log(Na)","log(K)","log(Mg)","log(RR)","log(C:N)","log(C:P)")
 matrix_lakes_p <- acast(lakes_cor, variable1~variable2, value.var = "p", fun.aggregate = mean)
 corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "lower",tl.cex = 0.8, tl.col = "black", number.cex = 0.8,hclust="ward",cl.pos = "n", sig.level = c(0.01, 0.05, 0.1), insig = "label_sig",pch="*",pch.cex = 0.5, addrect = 3)
 corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "lower",tl.cex = 0.8, tl.col = "black", number.cex = 0.8,hclust="ward",cl.pos = "n", sig.level = 0.1, insig = "blank")
 corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "lower",tl.cex = 0.8, tl.col = "black", number.cex = 0.8,hclust="ward",cl.pos = "n", sig.level = 0.05, insig = "blank")
-
+corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "color",addCoef.col = "black",type = "lower",tl.cex = 0.9, tl.col = "black", number.cex = 0.7,hclust="single",cl.pos = "n", sig.level = 0.05, insig = "blank")
 dev.off()
 
+jpeg("8.version_control/big_cor.jpeg",width = 600,height = 600)
+corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "color",addCoef.col = "black",type = "lower",tl.cex = 0.9, tl.col = "black", number.cex = 0.7,hclust="single",cl.pos = "n", sig.level = 0.05, insig = "blank")
+dev.off()
+
+png("8.version_control/big_cor.png",width = 800,height = 800)
+corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "color",addCoef.col = "black",type = "lower",tl.cex = 0.8, tl.col = "black", number.cex = 0.8,hclust="single",cl.pos = "n", sig.level = 0.05, insig = "blank")
+dev.off()
+
+
 # RRlogmice -----
-logcovariates <- c("logRR","logRRn","logBdgT","logDOC","logCN","logDP","logEC","logFe","pH","Cells","SUVA","SARuv","logO2","logN2O","p_O2","p_CO2","c_CO2","p_CH4")
+
+logcovariates <- c("logRR","logRRn","logBdgT","logDOC","SUVA","SARuv","pH","logEC","logFe","logDP","logCN","logO2","logCO2","logN2O","Cells")
+
+
 RRlogmice <- select(lakes73log,logcovariates) %>% mice(method = "cart", m = M)
 
-lasso_var <- c("Intercept","logDOC","logDP","logEC","logFe","logO2","logN2O","logCN","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
+#lasso_var <- c("Intercept","logDOC","logDP","logEC","logFe","logO2","logN2O","logCN","pH","Cells","SUVA","SARuv","p_O2","p_CO2","c_CO2","p_CH4")
 
 # correlogram for RRlogmice -----
 pdf("8.version_control/correlogram.pdf", width= 10, height = 10)
 lakes_cor <- micombine.cor(RRlogmice, method="pearson") 
 matrix_lakes_cor <- attr(lakes_cor,"r_matrix")
-colnames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(C:N)","log(DP)","log(EC)","log(Fe)","pH","Cells","SUVA","SARuv","log(O2)","log(N2O)","p_O2","p_CO2","c_CO2","p_CH4")
-rownames(matrix_lakes_cor) <- c("log(RR)","log(RRn)", "log(BdgT)","log(DOC)","log(C:N)","log(DP)","log(EC)","log(Fe)","pH","Cells","SUVA","SARuv","log(O2)","log(N2O)","p_O2","p_CO2","c_CO2","p_CH4")
+colnames(matrix_lakes_cor) <- c("log(RR)","log(RRn)","log(BdgT)","log(DOC)","SUVA","SARuv","pH","log(EC)","log(Fe)","log(DP)","log(C:N)","log(O2)","log(CO2)","log(N2O)","Cells")
+rownames(matrix_lakes_cor) <- c("log(RR)","log(RRn)","log(BdgT)","log(DOC)","SUVA","SARuv","pH","log(EC)","log(Fe)","log(DP)","log(C:N)","log(O2)","log(CO2)","log(N2O)","Cells")
 matrix_lakes_p <- acast(lakes_cor, variable1~variable2, value.var = "p", fun.aggregate = mean)
 corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "upper",tl.cex = 1.5, tl.col = "black", number.cex = 1.5,hclust="single",cl.pos = "n", sig.level = 0.05, insig = "pch", pch = "X", pch.cex = 2)
 corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "lower",tl.cex = 0.9, tl.col = "black", number.cex = 0.9,hclust="single",cl.pos = "n", sig.level = 0.1, insig = "blank")
 corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "number",type = "lower",tl.cex = 0.9, tl.col = "black", number.cex = 0.9,hclust="single",cl.pos = "n", sig.level = 0.05, insig = "blank")
+corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "color",addCoef.col = "black",type = "lower",tl.cex = 0.9, tl.col = "black", number.cex = 0.7,hclust="single",cl.pos = "n", sig.level = 0.05, insig = "blank")
 dev.off()
 
 
-# lasso  -----
+# lasso + create long_lasso  -----
 
 lasso_RRlog <- milasso(RRlogmice,M,"logRR",c("logRRn","logBdgT"))
 write_xlsx(lasso_RRlog$lasso_coef,"8.version_control/lasso_coef_logRR.xlsx")
@@ -615,8 +618,9 @@ df2 <- select(lasso_BdgTlog$lasso_coef,c("param","pooled","number")) %>% mutate(
 df3 <- select(lasso_RRnlog$lasso_coef,c("param","pooled","number")) %>% mutate(Response = "logRRn")
 long_lasso <- rbind(df1,df2,df3) %>% filter(number > M/2) %>% filter(param != "Intercept")
 
+long_lasso$param <- c("SUVA","SARuv","log(Fe)","log(DP)","log(C:N)","Cells","log(DOC)","SARuv","pH","log(Fe)","log(DP)","log(C:N)","log(O2)","log(N2O)","Cells","log(DOC)","SUVA","SARuv","log(EC)","log(Fe)","log(DP)","log(CO2)")
 
-# plots lasso on pdf -----
+# Residual plots pdf -----
 pdf("8.version_control/lasso_res_plot.pdf",height = 10, width = 15)
 lasso_res_plot(lasso_RRlog, title = "Residual plots lasso regression RR")
 lasso_res_plot(lasso_BdgTlog, title = "Residual plots lasso regression BdgT")
@@ -624,8 +628,36 @@ lasso_res_plot(lasso_RRnlog, title = "Residual plots lasso regression RRn")
 
 dev.off()
 
+# model plot pdf ----------
 pdf("8.version_control/lasso_model_plot.pdf",height = 8,width = 6)
 
+long_lasso$group <- ordered(long_lasso$Response,levels = c("logRR","logRRn","logBdgT"))
+
+ggplot(long_lasso)+geom_col(aes(x=param,y=pooled,fill=group))+facet_grid(rows = vars(group),scales = "free_y")+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
+  scale_fill_viridis_d(end = 0.6)
+
+ggplot(long_lasso)+geom_col(aes(y=param,x=pooled,fill=group))+facet_grid(rows = vars(group),scale = "free_y",switch = "y")+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
+  scale_y_discrete(position = "right")+
+  scale_fill_viridis_d(end = 0.6)
+
+long_lasso %>% mutate(parameter = reorder_within(param,pooled,group)) %>%
+  ggplot()+geom_col(aes(y = parameter, x = pooled, fill = group))+
+  scale_y_reordered(position = "right")+
+  facet_grid(rows = vars(group),scales = "free_y",switch = "y")+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
+  scale_fill_viridis_d(end = 0.6)
+
+dev.off()
+
+# model plot png -----------------
 p1 <- lasso_simple_plot(lasso_RRlog,title = "log(RR)")
 print(p1)
 p2 <- lasso_simple_plot(lasso_RRnlog,title = "log(RRn)")
@@ -633,35 +665,21 @@ print(p2)
 p3 <- lasso_simple_plot(lasso_BdgTlog, title = "log(BdgT)")
 print(p3)
 
-ggplot(long_lasso)+geom_col(aes(x=param,y=pooled,fill=Response))+facet_grid(rows = vars(Response),scales = "free_y")+
-  labs(x="",y="Pooled coefficient")+
-  theme_light(base_size = 15)+
-  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
-  scale_fill_viridis_d(end = 0.6)
-
-ggplot(long_lasso)+geom_col(aes(y=param,x=pooled,fill=Response))+facet_grid(rows = vars(Response),scale = "free_y",switch = "y")+
-  labs(x="",y="Pooled coefficient")+
-  theme_light(base_size = 15)+
-  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
-  scale_y_discrete(position = "right")+
-  scale_fill_viridis_d(end = 0.6)
-
-dev.off()
-
-  
 png("8.version_control/lasso_models.png", width = 1500, height = 400)
 grid.arrange(p1+guides(col = F),p2+guides(col = F),p3 +guides(col = F),ncol = 3)
 dev.off()
 
 png("8.version_control/lasso_models.png", width = 500, height = 1000)
-grid.arrange(p1+guides(col = F),p2+guides(col = F),p3 +guides(col = F),nrow = 3)
+grid.arrange(p1+guides(col = F,size = F),p2+guides(col = F,size = F),p3 +guides(col = F, size = F),nrow = 3)
 dev.off()
 
 p1
 
+# --------------------
+# Linear model  ------ 
+# --------------------
 
-# Linear model  ----- 
-
+# Residual plots --------------
 pdf("8.version_control/gauss_lasso.pdf",height = 10,width = 15)
 gauss_lasso(RRlogmice,"logRR",lasso_RRlog)
 gauss_lasso(RRlogmice,"logBdgT",lasso_BdgTlog)
@@ -669,10 +687,13 @@ gauss_lasso(RRlogmice,"logRRn",lasso_RRnlog)
 
 dev.off()
 
+# Model plot pdf ------------------
 pdf("8.version_control/gauss_lasso_model.pdf",height = 6, width = 6)
-long_lm <- rbind(lm_fit_logRR,lm_fit_logRRn,lm_fit_logBdgT) %>% filter(lasso_param != "Intercept") # %>% filter(p.value < 0.05)
+long_lm <- rbind(lm_fit_logRR,lm_fit_logRRn,lm_fit_logBdgT) %>% filter(lasso_param != "Intercept") %>% filter(p.value < 0.05)
+long_lm$group <- ordered(long_lm$Response,levels = c("logRR","logRRn","logBdgT"))
 
-ggplot(long_lm)+geom_col(aes(x=lasso_param,y=estimate,fill=Response))+facet_grid(rows = vars(Response),scales = "free_y")+
+
+ggplot(long_lm)+geom_col(aes(x=lasso_param,y=estimate,fill=group))+facet_grid(rows = vars(group),scales = "free_y")+
   labs(x="",y="Pooled estimates")+
   theme_light(base_size = 15)+
   theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
@@ -684,9 +705,21 @@ ggplot(long_lm)+geom_col(aes(y=lasso_param,x=estimate,fill=Response))+facet_grid
   theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
   scale_fill_viridis_d(end = 0.5)
 
+long_lm %>% mutate(parameter = reorder_within(lasso_param,estimate,group)) %>%
+  ggplot()+geom_col(aes(y = parameter, x = estimate, fill = group))+
+  scale_y_reordered(position = "right")+
+  facet_grid(rows = vars(group),scales = "free_y",switch = "y")+
+  labs(x="",y="Pooled coefficient")+
+  theme_light(base_size = 15)+
+  theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
+  scale_fill_viridis_d(end = 0.6)
+
+
 dev.off()
+
+# model plot png -------
 png("8.version_control/gauss_lasso_models.png",width = 500, height = 1000)
-grid.arrange(simple_plotlogRR+guides(col = F),simple_plotlogRRn+guides(col = F), simple_plotlogBdgT + guides (col = F), nrow = 3)
+grid.arrange(simple_plotlogRR+guides(col = F,size = F),simple_plotlogRRn+guides(col = F,size = F), simple_plotlogBdgT + guides (col = F,size = F), nrow = 3)
 dev.off()
 
 # removing one outlier -----

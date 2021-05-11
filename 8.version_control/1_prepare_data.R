@@ -40,7 +40,7 @@ rr100lakes$lag_bdg <- difftime(rr100lakes$incub_date,rr100lakes$CBA_date,units =
 rr100lakes$H <- 10^(-rr100lakes$pH)
 
 rr100lakes$CN <- (rr100lakes$DOC/12.011)/(rr100lakes$DN/14.007)
-rr100lakes$CP <- (rr100lakes$DOC/12.011)/(rr100lakes$DP*10^(-3)/30.97)
+rr100lakes$CP <- (rr100lakes$DOC/12.011)/(rr100lakes$DP*10^/30.97)
 rr100lakes$NP <- (rr100lakes$DN/14.007)/(rr100lakes$DP*10^(-3)/30.97)
 rr100lakes$CNP <-  (rr100lakes$DOC/12.011)/(rr100lakes$DN/14.007)/(rr100lakes$DP/30.97*10^6)
 

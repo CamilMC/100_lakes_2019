@@ -1,5 +1,5 @@
 ---
-title: "Biodegradability of DNOM and its relation to lake water physicochemistry"
+title: "Factors governing biodegradability of Dissolved Natural Organic Matter in Lake Water"
 author: "Camille M. Crapart"
 date: "18/3/2021"
 output:
@@ -11,11 +11,8 @@ output:
 knitr::opts_chunk$set(echo = T, warning = F, message = F, error = F)
 ```
 
-# Script used for the paper
-This is the R script written to do the analysis and figures of the paper "Drivers of Biodegradability of Dissolved Natural Organic Matter".
-
-
-# Libraries
+# R script 
+## Libraries
 
 ```{r libraries}
 library(dplyr)
@@ -24,6 +21,7 @@ library(readxl)
 library(ggplot2)
 library(ggrepel)
 library(viridis)
+library(RColorBrewer)
 library(gridExtra)
 library(grid)
 
@@ -37,24 +35,39 @@ library(miceadds)
 library(glmnet)
 library(glmnetUtils)
 library(Metrics)
+
+library(rnaturalearth)
+library(rgeos)
+world <- ne_countries(scale = "medium", returnclass = "sf")
 ```
 
+## Useful functions
 ```{r additional-functions}
  not_all_na <- function(x) {any(!is.na(x))}
  not_any_na <- function(x) {all(!is.na(x))}
  
- fill.na <- function(df){
-  for (i in names(df)){
-    lna <- which(is.na(df[,i]))
-    df[lna,i] <- rep(mean(df[,i],na.rm=T),length(lna))
+ boxplot_bdg <- function(data,resp.var,outlier.name = T){
+  g <- ggplot()+geom_boxplot(data = data, aes(x = "", y = data[,resp.var]))
+  outliers <- ggplot_build(g)[["data"]][[1]][["outliers"]] %>% as.data.frame()
+  outliers_ID <- filter(data, data[,resp.var] %in% outliers[[1]]) %>% dplyr::select(Lake_name)
+  outliers$Lake_ID <- outliers_ID$Lake_name
+  names(outliers) <- c(resp.var,"Lake_name")
+  
+  if(outlier.name == T){
+  g <- ggplot()+geom_boxplot(data=data,aes(x="",y=data[,resp.var]),outlier.size = 3, width = 1.5)+theme_light(base_size = 20) + xlab("")+ylab(resp.var)+
+    geom_text_repel(data = outliers, aes(x="",y=outliers[,resp.var],label = Lake_name),position = position_dodge(width = 2), size = 6, col = "steelblue4", segment.size = 1)
+  }else if(outlier.name == F){
+  g <- ggplot()+geom_boxplot(data=data,aes(x="",y=data[,resp.var]),outlier.size = 3, width = 1)+theme_light(base_size = 20) + xlab("")+ylab(resp.var)
   }
-  return(df)
+  print(g)
 }
 
 ```
 
+## Load data and log transformation
 ```{r load-data}
 # load data 
+lakes73 <- read.csv("8.version_control/rr100lakes.csv")
 lakes73u <- read_xlsx("8.version_control/lakes73u.xlsx") %>% as.data.frame()
 
 # log-transform data
@@ -67,27 +80,16 @@ lakes73log[lakes73log == "-Inf"] <- NA
 sequence <- c("Lake_name","logRR","logRRn","logBdgT","logDOC","SUVA","sVISa","SARuv","SR","pH","logAlkalinity","logT","logEC","logCa","logMg","logNa","logK","logFe","logAl","logSO4","logCl","logB","logDN","logDP","logCN","logCP","logO2","logCO2","logN2O","logCH4","Cells")
 
 lakes73log <- select(lakes73log,all_of(sequence))
+lakes73sd <- lakes73log[,-1] %>% scale(center = T, scale = T) %>% as.data.frame()
+lakes73log <- lakes73sd
+
+#sd_param <- sapply(lakes73log,sd, na.rm = T) %>% as.data.frame() %>% tibble::rownames_to_column() %>% setNames(c("param","sd"))
 
 ```
 ## Distribution of response variables
 
 ```{r summary-statistics, fig.dim = c(4,6)}
 
-boxplot_bdg <- function(data,resp.var,outlier.name = T){
-  g <- ggplot()+geom_boxplot(data = data, aes(x = "", y = data[,resp.var]))
-  outliers <- ggplot_build(g)[["data"]][[1]][["outliers"]] %>% as.data.frame()
-  outliers_ID <- filter(data, data[,resp.var] %in% outliers[[1]]) %>% dplyr::select(Lake_name)
-  outliers$Lake_ID <- outliers_ID$Lake_name
-  names(outliers) <- c(resp.var,"Lake_name")
-  
-  if(outlier.name = T){
-  g <- ggplot()+geom_boxplot(data=data,aes(x="",y=data[,resp.var]),outlier.size = 3, width = 1.5)+theme_light(base_size = 20) + xlab("")+ylab(resp.var)+
-    geom_text_repel(data = outliers, aes(x="",y=outliers[,resp.var],label = Lake_name),position = position_dodge(width = 2), size = 6, col = "steelblue4", segment.size = 1)
-  }else if(outlier.name = F){
-  g <- ggplot()+geom_boxplot(data=data,aes(x="",y=data[,resp.var]),outlier.size = 3, width = 1.5)+theme_light(base_size = 20) + xlab("")+ylab(resp.var)
-  }
-  print(g)
-}
 
 g <- boxplot_bdg(lakes73u,"RR",outlier.name = F)
 h <- boxplot_bdg(lakes73u,"BdgT",outlier.name = F)
@@ -97,9 +99,22 @@ i <- boxplot_bdg(lakes73log,"logRR",outlier.name = F)
 j <- boxplot_bdg(lakes73log,"logBdgT",outlier.name = F)
 lakes73log$Lake_name <- NULL
 
+png("8.version_control/boxplot_RR.png",type = "cairo", units = "in", width = 20, height = 10,res = 100)
+grid.arrange(g,h,i,j, ncol = 4)
+dev.off()
 
 ```
 
+```{r DOC-map}
+ggplot() + geom_sf(data=world,fill = "white") + coord_sf(xlim = c(4.5,12.9), ylim = c(58, 62), expand = F)+
+  geom_point(data=filter(lakes73,DOC < 21),aes(x=Long,y=Lat,col=DOC,size=DOC))+
+  scale_color_gradientn(colors = brewer.pal(n = 9, name = "YlOrBr"))+
+  geom_point(data = filter(lakes73,DOC > 21),aes(x=Long,y=Lat),size = 7, col = "#660000")+
+  geom_text(data = filter(lakes73,DOC > 21), aes(x=Long,y=Lat,label=round(DOC,0)),nudge_y = 0,nudge_x = 0,size = 3,col = "white")+
+  guides(color = guide_legend(),size=guide_legend())+theme_void(base_size = 20)
+ggsave("8.version_control/map_DOC.jpeg",width=8,height=6)
+
+```
 
 ```{r Multiple-imputation-independant-variables}
 M <- 50
@@ -125,7 +140,7 @@ corrplot::corrplot(corr = matrix_full_lakes_cor,  p.mat = matrix_full_lakes_p, m
 dev.off()
 ```
 
-
+## Mice
 ```{r multiple-imputation}
 
 logcovariates <- c("logRR","logRRn","logBdgT","logDOC","SUVA","SARuv","pH","logEC","logFe","logDP","logCN","logO2","logCO2","logN2O","Cells")
@@ -151,7 +166,7 @@ corrplot::corrplot(corr = matrix_lakes_cor,  p.mat = matrix_lakes_p, method = "c
 dev.off()
 ```
 
-
+## Lasso and linear model functions
 ```{r model-functions}
 milasso <- function(mice.object,M,resp.var,excluded.var){
   
@@ -176,7 +191,7 @@ milasso <- function(mice.object,M,resp.var,excluded.var){
     data <- complete(mice.object,z) %>% dplyr::select(!all_of(excluded.var))
     set.seed(5)
     lasso.formula <- as.formula(paste(resp.var,"~.",sep=""))
-    fit <- cv.glmnet(formula = lasso.formula,data = data)
+    fit <- cv.glmnet(formula = lasso.formula,data = data, standardize = T)
     coef_fit <- fit %>% coef(s="lambda.min") %>% summary()
     l <- length(fit$lambda)
     
@@ -283,10 +298,17 @@ lasso_simple_plot <- function(lasso_list, title = ""){
   y <- lasso_list$lasso_res$pooled
 
   # Fitted vs observed
-  g1 <- qplot(w,x,col=y,size = 3)+
-    labs(x = "Observed values", y = "Fitted values" , title = paste("Fitted values vs. observations",title, sep = " "),col="Residuals")+
+  # g1 <- qplot(w,x,col=y,size = 3)+
+  #   labs(x = "Observed values", y = "Fitted values" , title = paste("Fitted values vs. observations",title, sep = " "),col="Residuals")+
+  #   geom_abline(intercept = 0, slope = 1, col = "gray")+
+  #   scale_color_gradientn(colours = viridis(5, direction = -1, end = 1 ,begin = 0.1), breaks = c(-0.5, 0, 0.5, 1), labels =c("-0.5", "0", "0.5", "1") )+
+  #   annotate("label",x = max(w) - (max(w)-min(w))/6, y = min(x) + (max (x)-min(x))/6, label = paste("MAE",round(mae(w,x),2),sep = " = "), size = 5)+
+  #   theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"), legend.position = "left")
+  # plot(g1)
+  
+  g1 <- qplot(w,x,size = 3)+
+    labs(x = "Observed values", y = "Fitted values" , title = paste("Fitted values vs. observations",title, sep = " "))+
     geom_abline(intercept = 0, slope = 1, col = "gray")+
-    scale_color_gradientn(colours = viridis(5, direction = -1, end = 1 ,begin = 0.1), breaks = c(-0.5, 0, 0.5, 1), labels =c("-0.5", "0", "0.5", "1") )+
     annotate("label",x = max(w) - (max(w)-min(w))/6, y = min(x) + (max (x)-min(x))/6, label = paste("MAE",round(mae(w,x),2),sep = " = "), size = 5)+
     theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"), legend.position = "left")
   plot(g1)
@@ -307,9 +329,19 @@ gauss_lasso <- function (mice.object,resp.var,lasso_list){
   
   lm_fm <- paste(resp.var,paste(covar_lm[-1],collapse = "+"), sep = "~")
   
-  lm_df <- with(mice.object,lm(as.formula(lm_fm))) %>% pool() %>% summary() %>% as.data.frame() %>% select(c("term","estimate","p.value"))
+  lm_df <- with(mice.object,lm(as.formula(lm_fm))) %>% pool() %>% summary() %>% as.data.frame() %>% select(c("term","estimate","p.value","std.error"))
   levels(lm_df$term)[which(levels(lm_df$term) == "(Intercept)")] <- "Intercept"
+  
   fit_print <- merge(lasso_param,lm_df, by.x= "lasso_param",by.y = "term", all.x = T) %>% mutate(Response = resp.var)
+  
+  
+  lm_confint_with <- with(mice.object,confint(lm(as.formula(lm_fm))))
+  lm_confint <- list.cbind(lm_confint_with$analyses) %>% as.data.frame()
+  lm_confint$ci_min <- lm_confint[,which(names(lm_confint) == "2.5 %")] %>% rowMeans()
+  lm_confint$ci_max <- lm_confint[,which(names(lm_confint) == "97.5 %")] %>% rowMeans()
+  lm_confint$param <- rownames(lm_confint)
+  
+  fit_print <- merge(fit_print,select(lm_confint,c("ci_min","ci_max","param")),by.x = "lasso_param",by.y = "param")
   assign(paste("lm_fit_",resp.var,sep=""), fit_print,envir = .GlobalEnv)
   
   lm_pred_with <- with(mice.object,predict(lm(as.formula(lm_fm))))
@@ -368,12 +400,20 @@ gauss_lasso <- function (mice.object,resp.var,lasso_list){
   
   grid.arrange(g1,g2,g4,g5,ncol = 2, top = textGrob(title,gp = gpar(fontsize = 25, font = 3)))
   
-  g7 <- qplot(lm_obs,lm_pred,col=lm_rstandard,size = 3)+
-    labs(x = "Observed values", y = "Fitted values" , title = paste("Multiple linear regression", resp.var, sep = " "),col="Standardised Residuals")+
+  # g7 <- qplot(lm_obs,lm_pred,col=lm_rstandard,size = 3)+
+  #   labs(x = "Observed values", y = "Fitted values" , title = paste("Multiple linear regression", resp.var, sep = " "),col="Standardised Residuals")+
+  #   geom_abline(intercept = 0, slope = 1, col = "gray")+
+  #   scale_color_gradientn(colours = viridis(5, direction = -1, end = 1 ,begin = 0.1), breaks = c(-3,-2,-1,0,1,2,3), labels =c("-3","-2","-1","0","1","2","3"))+
+  #   annotate("label",x = max(lm_obs) - (max(lm_obs)-min(lm_obs))/6, y = min(lm_pred) + (max (lm_pred)-min(lm_pred))/6, label = paste("MAE",round(mae(lm_obs,lm_pred),2),sep = " = "), size = 5)+
+  #   theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"))
+  # 
+  g7 <- qplot(lm_obs,lm_pred,size = 3)+
+    labs(x = "Observed values", y = "Fitted values" , title = paste("Multiple linear regression", resp.var, sep = " "))+
     geom_abline(intercept = 0, slope = 1, col = "gray")+
-    scale_color_gradientn(colours = viridis(5, direction = -1, end = 1 ,begin = 0.1), breaks = c(-3,-2,-1,0,1,2,3), labels =c("-3","-2","-1","0","1","2","3"))+
     annotate("label",x = max(lm_obs) - (max(lm_obs)-min(lm_obs))/6, y = min(lm_pred) + (max (lm_pred)-min(lm_pred))/6, label = paste("MAE",round(mae(lm_obs,lm_pred),2),sep = " = "), size = 5)+
     theme_bw(base_size=15)+ theme(panel.grid = element_line(color="gray95"))
+  
+  
   assign(paste("simple_plot",resp.var,sep = ""),g7, envir = .GlobalEnv)
 }  
 
@@ -392,9 +432,13 @@ lasso_RRnlog <- milasso(RRlogmice,M,"logRRn",c("logRR","logBdgT"))
 df1 <- select(lasso_RRlog$lasso_coef,c("param","pooled","number")) %>% mutate(response = "logRR")
 df2 <- select(lasso_BdgTlog$lasso_coef,c("param","pooled","number")) %>% mutate(response = "logBdgT")
 df3 <- select(lasso_RRnlog$lasso_coef,c("param","pooled","number")) %>% mutate(response = "logRRn")
+
 long_lasso <- rbind(df1,df2,df3) %>% filter(number > M/2) %>% filter(param != "Intercept")
 
-long_lasso$param <- c("SUVA","SARuv","log(Fe)","log(DP)","log(C:N)","Cells","log(DOC)","SARuv","pH","log(Fe)","log(DP)","log(C:N)","log(O2)","log(N2O)","Cells","log(DOC)","SUVA","SARuv","log(EC)","log(Fe)","log(DP)","log(CO2)")
+#long_lasso <- merge(long_lasso,sd_param,by.x = "param", by.y = "param")
+
+
+#long_lasso$param <- c("Cells","Cells","log(C:N)","log(C:N)","log(CO2)","log(DOC)","log(DOC)","log(DP)","log(DP)","log(DP)","log(EC)","log(Fe)","log(Fe)","log(Fe)","log(N2O)","log(O2)","pH","SARuv","SARuv","SARuv","SUVA","SUVA")
 long_lasso$group <- ordered(long_lasso$response,levels = c("logRR","logRRn","logBdgT"))
 long_lasso$estimate <- long_lasso$pooled %>% round (digits= 2)
 
@@ -404,11 +448,11 @@ long_lasso$estimate <- long_lasso$pooled %>% round (digits= 2)
 lasso_result <- select(long_lasso, c("group","param","estimate")) %>% spread(key = "group", value = "estimate")
 print(lasso_result)
 
-long_lasso %>% mutate(parameter = reorder_within(param,pooled,group)) %>%
-  ggplot()+geom_col(aes(y = parameter, x = pooled, fill = group))+
+long_lasso %>% mutate(parameter = reorder_within(param,estimate,group)) %>%
+  ggplot()+geom_col(aes(y = parameter, x = estimate, fill = group))+
   scale_y_reordered(position = "right")+
   facet_grid(rows = vars(group),scales = "free_y",switch = "y")+
-  labs(x="",y="Pooled coefficient")+
+  labs(x="",y="Coefficient (* sd)")+
   theme_light(base_size = 15)+
   theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
   scale_fill_viridis_d(end = 0.6)
@@ -441,10 +485,11 @@ dev.off()
 
 ```
 
+## Linear regression
 ```{r res-linear-model, fig.height= 10, fig.width=15}
 gauss_lasso(RRlogmice,"logRR",lasso_RRlog)
-gauss_lasso(RRlogmice,"logRRn",lasso_BdgTlog)
-gauss_lasso(RRlogmice,"logBdgT",lasso_RRnlog)
+gauss_lasso(RRlogmice,"logRRn",lasso_RRnlog)
+gauss_lasso(RRlogmice,"logBdgT",lasso_BdgTlog)
 
 ```
 
@@ -453,17 +498,18 @@ png("8.version_control/gauss_res_RR.png", type = "cairo", units = "in", res = 15
 gauss_lasso(RRlogmice,"logRR",lasso_RRlog)
 dev.off()
 png("8.version_control/gauss_res_RRn.png", type = "cairo", units = "in", res = 150, width = 12, height = 8)
-gauss_lasso(RRlogmice,"logRRn",lasso_BdgTlog)
+gauss_lasso(RRlogmice,"logRRn",lasso_RRnlog)
 dev.off()
 
 png("8.version_control/gauss_res_BdgT.png", type = "cairo", units = "in", res = 150, width = 12, height = 8)
-gauss_lasso(RRlogmice,"logBdgT",lasso_RRnlog)
+gauss_lasso(RRlogmice,"logBdgT",lasso_BdgTlog)
 dev.off()
 
 ```
 
 ```{r plot-lm}
 long_lm <- rbind(lm_fit_logRR,lm_fit_logRRn,lm_fit_logBdgT) %>% filter(lasso_param != "Intercept") %>% filter(p.value < 0.05)
+#long_lm <- merge(long_lm,sd_param,by.x = "lasso_param", by.y = "param")
 long_lm$group <- ordered(long_lm$Response,levels = c("logRR","logRRn","logBdgT"))
 long_lm$round_estimate <- long_lm$estimate %>% round(digits = 2)
 
@@ -472,9 +518,10 @@ print(lm_result)
 
 long_lm %>% mutate(parameter = reorder_within(lasso_param,estimate,group)) %>%
   ggplot()+geom_col(aes(y = parameter, x = estimate, fill = group))+
+  geom_errorbar(aes(y = parameter, x = estimate, xmin=ci_min,xmax = ci_max),width = .3)+
   scale_y_reordered(position = "right")+
   facet_grid(rows = vars(group),scales = "free_y",switch = "y")+
-  labs(x="",y="Pooled coefficient")+
+  labs(x="",y="Multiple Linear Model Coefficients")+
   theme_light(base_size = 15)+
   theme(legend.position = "none",axis.text.x = element_text(angle = 45,hjust = 1),panel.grid.minor = element_line(colour = NA),panel.grid.major = element_line(colour = "gray95"))+
   scale_fill_viridis_d(end = 0.6)

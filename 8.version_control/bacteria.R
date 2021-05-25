@@ -74,7 +74,7 @@ colors_cluster <- viridis(nb_clusters,end = 0.8,direction = -1)
 dend_bacteria <- as.dendrogram(hc)
 plot(dend_bacteria)
 dend_bact_polar <- dend_bacteria %>% color_branches(k=nb_clusters,col=colors_cluster) %>% color_labels(k=nb_clusters,col=colors_cluster)
-library(circlize)
+library(dendextend)
 circlize_dendrogram(dend_bact_polar,dend_trackheight = .4)
 
 # circle cluster with lake name -----
@@ -93,7 +93,7 @@ dend_bacteria_name <- as.dendrogram(hc)
 plot(dend_bacteria_name)
 dend_bact_polar <- dend_bacteria_name %>% color_branches(k=nb_clusters,col=colors_cluster) %>% color_labels(k=nb_clusters,col=colors_cluster)
 library(circlize)
-png("8.version_control/dendrogram_bact.png",width=600,height = 600)
+png("8.version_control/dendrogram_bact.png",type = "cairo", units = "in", res = 150, width = 8, height = 8)
 circlize_dendrogram(dend_bact_polar,dend_trackheight = .8,labels_track_height = 0.3)
 dev.off()
 
@@ -103,6 +103,19 @@ dev.off()
 lakes73$bact_cluster <- cutree(dend_bacteria,nb_clusters)
 aov(RR~bact_cluster,data=lakes73) %>% summary()
 aov(BdgT~bact_cluster,data=lakes73) %>% summary()
+aov(RR/DOC~bact_cluster,data=lakes73) %>% summary()
+aov(DOC~bact_cluster,data=lakes73) %>% summary()
+aov(EC~bact_cluster,data=lakes73) %>% summary()
+aov(pH~bact_cluster,data=lakes73) %>% summary()
+aov(Alkalinity~bact_cluster,data=lakes73) %>% summary()
+aov(DN~bact_cluster,data=lakes73) %>% summary()
+aov(DP~bact_cluster,data=lakes73) %>% summary()
+aov(CN~bact_cluster,data=lakes73) %>% summary()
+aov(CP~bact_cluster,data=lakes73) %>% summary()
+aov(SUVA~bact_cluster,data=lakes73) %>% summary()
+aov(DOC~bact_cluster,data=lakes73) %>% summary()
+
+
 
 # adds the distance to lakes70 dataframe
 #lakes70_bact <- merge(lakes70,dist_bacteria,by.x="Sample_ID",by.y = "Sample_ID")

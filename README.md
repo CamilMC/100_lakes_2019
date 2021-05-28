@@ -17,4 +17,8 @@ Run "Scripts" in this order:
   - returns "lakes73u.xlsx" with the selected covariates
   - returns all the figures of the article and supplementary material in .png
   - returns "3.data_analysis.html", an HTML version of the markdown
+
+4.bacteria
+  - loads "CBA_100Lakes_bacteria.xlsx"
+  - returns Figure3: dendrogram of bacterial communities. 
   

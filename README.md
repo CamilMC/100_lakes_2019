@@ -1,6 +1,7 @@
 # 100_lakes_2019
 
-These are the script and data used in "Factors of Biodegradability of Dissolved Organic Matter in Lake Water". 
+These are the script and data used in "Factors of Biodegradability of Dissolved Organic Matter in Lake Water":
+<div class="csl-entry">Crapart, C., Andersen, T., Hessen, D. O., Valiente, N., &#38; Vogt, R. D. (2021). Factors governing biodegradability of dissolved natural organic matter in lake water. <i>Water (Switzerland)</i>, <i>13</i>(16). https://doi.org/10.3390/w13162210</div>
 
 Run "Scripts" in this order: 
 1.respiration_rate.R : computes the respiration rate in all samples. 
